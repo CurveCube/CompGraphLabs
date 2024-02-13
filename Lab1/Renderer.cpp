@@ -43,8 +43,8 @@ bool Renderer::Init(HINSTANCE hInstance, HWND hWnd) {
         UINT adapterIdx = 0;
         while (SUCCEEDED(pFactory->EnumAdapters(adapterIdx, &pAdapter))) {
             DXGI_ADAPTER_DESC desc;
-            pAdapter->GetDesc(&desc);
-            if (wcscmp(desc.Description, L"Microsoft Basic Render Driver")) {
+            result = pAdapter->GetDesc(&desc);
+            if (SUCCEEDED(result) && wcscmp(desc.Description, L"Microsoft Basic Render Driver")) {
                 pSelectedAdapter = pAdapter;
                 break;
             }

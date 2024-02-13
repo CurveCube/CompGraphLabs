@@ -57,7 +57,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE     hInstance,
             if (WM_QUIT == msg.message)
                 exit = true;
         }
-        renderer.Render();
+        if (!renderer.Render())
+            return FALSE;
     }
 
     return (int) msg.wParam;
