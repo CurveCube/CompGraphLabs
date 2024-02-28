@@ -64,5 +64,5 @@ private:
 	std::chrono::time_point<std::chrono::steady_clock> m_lastFrame;
 
 	float adapt = 0.0f;
-	float s = 0.01f;
+	float s = 0.5f;
 };
