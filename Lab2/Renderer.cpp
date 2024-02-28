@@ -402,7 +402,7 @@ bool Renderer::UpdateScene() {
 
             brightness[i] = lights_[i].color.w;
             str = "Brightness " + std::to_string(i);
-            ImGui::DragFloat(str.c_str(), &brightness[i], 1.0f, 1.0f, 100.0f);
+            ImGui::DragFloat(str.c_str(), &brightness[i], 1.0f, 1.0f, 1000.0f);
             lights_[i].color.w = brightness[i];
         }
 

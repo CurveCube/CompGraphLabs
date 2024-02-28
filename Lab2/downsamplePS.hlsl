@@ -19,9 +19,9 @@ SamplerState maxSampler : register(s2);
 
 PS_OUTPUT main(PS_INPUT input) : SV_TARGET{
     PS_OUTPUT output;
-    output.avg = avgTexture.Sample(avgSampler, input.uv).xyz;
-    output.min = minTexture.Sample(minSampler, input.uv).xyz;
-    output.max = maxTexture.Sample(maxSampler, input.uv).xyz;
+    output.avg = avgTexture.Sample(avgSampler, input.uv).x;
+    output.min = minTexture.Sample(minSampler, input.uv).x;
+    output.max = maxTexture.Sample(maxSampler, input.uv).x;
 
     return output;
 }
