@@ -95,9 +95,9 @@ XMINT3 Input::ReadKeyboard() {
         if (keyboardState_[DIK_DOWN] || keyboardState_[DIK_S])
             keys.x = -1.0f;
         if (keyboardState_[DIK_RIGHT] || keyboardState_[DIK_D])
-            keys.z = 1.0f;
-        if (keyboardState_[DIK_LEFT] || keyboardState_[DIK_A])
             keys.z = -1.0f;
+        if (keyboardState_[DIK_LEFT] || keyboardState_[DIK_A])
+            keys.z = 1.0f;
         if (keyboardState_[DIK_RSHIFT] || keyboardState_[DIK_Q])
             keys.y = 1.0f;
         if (keyboardState_[DIK_RCONTROL] || keyboardState_[DIK_E])
