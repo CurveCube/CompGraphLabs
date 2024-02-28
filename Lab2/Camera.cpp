@@ -25,8 +25,8 @@ void Camera::Rotate(float dphi, float dtheta) {
 
 void Camera::Zoom(float dr) {
     r_ += dr;
-    if (r_ < 2.0f) {
-        r_ = 2.0f;
+    if (r_ < 1.0f) {
+        r_ = 1.0f;
     }
     position_ = XMFLOAT3(focus_.x - cosf(theta_) * cosf(phi_) * r_,
         focus_.y - sinf(theta_) * r_,
@@ -36,8 +36,8 @@ void Camera::Zoom(float dr) {
 }
 
 void Camera::Move(float dx, float dy, float dz) {
-    focus_ = XMFLOAT3(focus_.x + dx, focus_.y + dy, focus_.z + dz);
-    position_ = XMFLOAT3(position_.x + dx, position_.y + dy, position_.z + dz);
+    focus_ = XMFLOAT3(focus_.x + dx * cosf(phi_) - dz * sinf(phi_), focus_.y + dy, focus_.z + dx * sinf(phi_) + dz * cosf(phi_));
+    position_ = XMFLOAT3(position_.x + dx * cosf(phi_) - dz * sinf(phi_), position_.y + dy, position_.z + dx * sinf(phi_) + dz * cosf(phi_));
 
     UpdateViewMatrix();
 }
