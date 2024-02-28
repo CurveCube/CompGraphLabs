@@ -4,6 +4,7 @@
 #include "Camera.h"
 #include "Input.h"
 #include "D3DInclude.h"
+#include "ToneMapping.h"
 #include <vector>
 #include <string>
 
@@ -84,4 +85,6 @@ private:
 
     UINT width_;
     UINT height_;
+
+    ToneMapping toneMapping;
 };

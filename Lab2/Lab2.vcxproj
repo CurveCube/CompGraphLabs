@@ -38,6 +38,7 @@
     <ClInclude Include="Resource.h" />
     <ClInclude Include="SceneMatrixBuffer.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="ToneMapping.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Camera.cpp" />
@@ -53,6 +54,7 @@
     <ClCompile Include="Input.cpp" />
     <ClCompile Include="Lab2.cpp" />
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="ToneMapping.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="directx.ico" />

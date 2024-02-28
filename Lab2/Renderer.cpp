@@ -101,14 +101,24 @@ bool Renderer::Init(HINSTANCE hInstance, HWND hWnd) {
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     swapChainDesc.Flags = 0;
     result = pFactory->CreateSwapChain(pDevice_, &swapChainDesc, &pSwapChain_);
-
+    
     ID3D11Texture2D* pBackBuffer = NULL;
     if (SUCCEEDED(result)) {
         result = pSwapChain_->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
     }
     if (SUCCEEDED(result)) {
-        result = pDevice_->CreateRenderTargetView(pBackBuffer, NULL, &pRenderTargetView_);
+        D3D11_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+        rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; // Формат RTV совпадает с форматом текстуры
+        rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+        rtvDesc.Texture2D.MipSlice = 0;
+
+        result = pDevice_->CreateRenderTargetView(pBackBuffer, &rtvDesc, &pRenderTargetView_);
     }
+
+    if (SUCCEEDED(result)) {
+        result = toneMapping.Init(pDevice_, width_, height_);
+    }
+
     if (SUCCEEDED(result)) {
         result = InitScene();
     }
@@ -328,7 +338,7 @@ HRESULT Renderer::InitScene() {
       desc.MaxAnisotropy = 16;
       desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
       desc.BorderColor[0] = desc.BorderColor[1] = desc.BorderColor[2] = desc.BorderColor[3] = 1.0f;
-
+      
       result = pDevice_->CreateSamplerState(&desc, &pSampler_);
     }
 
@@ -410,7 +420,7 @@ bool Renderer::UpdateScene() {
     t = (timeCur - timeStart) / 1000.0f;
 
     WorldMatrixBuffer worldMatrixBuffer;
-    worldMatrixBuffer.worldMatrix = XMMatrixRotationY(t);
+    worldMatrixBuffer.worldMatrix = XMMatrixRotationY(0);
     worldMatrixBuffer.shine = XMFLOAT4(300.0f, 0.0f, 0.0f, 0.0f);
 
     pDeviceContext_->UpdateSubresource(pWorldMatrixBuffer_, 0, nullptr, &worldMatrixBuffer, 0, 0);
@@ -450,11 +460,8 @@ bool Renderer::Render() {
 
     pDeviceContext_->ClearState();
 
-    ID3D11RenderTargetView* views[] = { pRenderTargetView_ };
-    pDeviceContext_->OMSetRenderTargets(1, views, NULL);
-
-    static const FLOAT backColor[4] = { 0.4f, 0.2f, 0.4f, 1.0f };
-    pDeviceContext_->ClearRenderTargetView(pRenderTargetView_, backColor);
+    toneMapping.ClearRenderTarget(pDeviceContext_);
+    toneMapping.SetRenderTarget(pDeviceContext_);
 
 #ifdef _DEBUG
     pAnnotation_->EndEvent();
@@ -507,6 +514,19 @@ bool Renderer::Render() {
     pAnnotation_->EndEvent();
 #endif
 
+    toneMapping.RenderBrightness(pDeviceContext_);
+
+    ID3D11RenderTargetView* views[] = { pRenderTargetView_ };
+    pDeviceContext_->OMSetRenderTargets(1, views, NULL);
+    pDeviceContext_->PSSetSamplers(0, 1, samplers);
+
+    static const FLOAT backColor[4] = { 0.4f, 0.2f, 0.4f, 1.0f };
+    pDeviceContext_->ClearRenderTargetView(pRenderTargetView_, backColor);
+
+    pDeviceContext_->RSSetViewports(1, &viewport);
+
+    toneMapping.RenderTonemap(pDeviceContext_);
+
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
     HRESULT result = pSwapChain_->Present(0, 0);
@@ -534,8 +554,17 @@ bool Renderer::Resize(UINT width, UINT height) {
     if (!SUCCEEDED(result))
         return false;
 
-    result = pDevice_->CreateRenderTargetView(pBuffer, NULL, &pRenderTargetView_);
+    D3D11_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+    rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; // Формат RTV совпадает с форматом текстуры
+    rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+    rtvDesc.Texture2D.MipSlice = 0;
+
+    result = pDevice_->CreateRenderTargetView(pBuffer, &rtvDesc, &pRenderTargetView_);
     SAFE_RELEASE(pBuffer);
+    if (!SUCCEEDED(result))
+        return false;
+
+    result = toneMapping.Resize(pDevice_, width_, height_);
     if (!SUCCEEDED(result))
         return false;
 
