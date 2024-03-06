@@ -114,4 +114,5 @@ private:
     UINT height_;
 
     ToneMapping toneMapping_;
+    bool default_ = true;
 };

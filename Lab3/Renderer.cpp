@@ -276,7 +276,20 @@ HRESULT Renderer::LoadShaders() {
     HRESULT result = pVSManager_.loadVS(L"VS.hlsl", nullptr, "sphere",
         &pILManager_, VertexDesc, sizeof(VertexDesc) / sizeof(VertexDesc[0]));
     if (SUCCEEDED(result)) {
-        result = pPSManager_.loadPS(L"PS.hlsl", nullptr, "default");
+        D3D_SHADER_MACRO shaderMacros[] = { {"DEFAULT"}, {NULL, NULL} };
+        result = pPSManager_.loadPS(L"PS.hlsl", shaderMacros, "default");
+    }
+    if (SUCCEEDED(result)) {
+        D3D_SHADER_MACRO shaderMacros[] = { {"FRESNEL"}, {NULL, NULL} };
+        result = pPSManager_.loadPS(L"PS.hlsl", shaderMacros, "fresnel");
+    }
+    if (SUCCEEDED(result)) {
+        D3D_SHADER_MACRO shaderMacros[] = { {"ND"}, {NULL, NULL} };
+        result = pPSManager_.loadPS(L"PS.hlsl", shaderMacros, "ndf");
+    }
+    if (SUCCEEDED(result)) {
+        D3D_SHADER_MACRO shaderMacros[] = { {"GEOMETRY"}, {NULL, NULL} };
+        result = pPSManager_.loadPS(L"PS.hlsl", shaderMacros, "geometry");
     }
     if (SUCCEEDED(result)) {
         result = pVSManager_.loadVS(L"CubeMapVS.hlsl", nullptr, "skybox",
@@ -358,60 +371,93 @@ HRESULT Renderer::LoadGeometry() {
     sphereVertices[(__int64)numVertices - 1].norm.y = 0.0f;
     sphereVertices[(__int64)numVertices - 1].norm.z = -1.0f;
 
-    std::vector<UINT> indices(numIndices);
+    std::vector<UINT> skyboxIndices(numIndices);
+    std::vector<UINT> sphereIndices(numIndices);
 
     UINT k = 0;
     for (UINT i = 0; i < LongLines - 1; i++) {
-        indices[k] = 0;
-        indices[(__int64)k + 2] = i + 1;
-        indices[(__int64)k + 1] = i + 2;
+        skyboxIndices[k] = 0;
+        skyboxIndices[(__int64)k + 2] = i + 1;
+        skyboxIndices[(__int64)k + 1] = i + 2;
+
+        sphereIndices[k] = i + 1;
+        sphereIndices[(__int64)k + 2] = 0;
+        sphereIndices[(__int64)k + 1] = i + 2;
         k += 3;
     }
-    indices[k] = 0;
-    indices[(__int64)k + 2] = LongLines;
-    indices[(__int64)k + 1] = 1;
+    skyboxIndices[k] = 0;
+    skyboxIndices[(__int64)k + 2] = LongLines;
+    skyboxIndices[(__int64)k + 1] = 1;
+
+    sphereIndices[k] = LongLines;
+    sphereIndices[(__int64)k + 2] = 0;
+    sphereIndices[(__int64)k + 1] = 1;
     k += 3;
 
     for (UINT i = 0; i < LatLines - 3; i++) {
         for (UINT j = 0; j < LongLines - 1; j++) {
-            indices[k] = i * LongLines + j + 1;
-            indices[(__int64)k + 1] = i * LongLines + j + 2;
-            indices[(__int64)k + 2] = (i + 1) * LongLines + j + 1;
+            skyboxIndices[k] = i * LongLines + j + 1;
+            skyboxIndices[(__int64)k + 1] = i * LongLines + j + 2;
+            skyboxIndices[(__int64)k + 2] = (i + 1) * LongLines + j + 1;
 
-            indices[(__int64)k + 3] = (i + 1) * LongLines + j + 1;
-            indices[(__int64)k + 4] = i * LongLines + j + 2;
-            indices[(__int64)k + 5] = (i + 1) * LongLines + j + 2;
+            skyboxIndices[(__int64)k + 3] = (i + 1) * LongLines + j + 1;
+            skyboxIndices[(__int64)k + 4] = i * LongLines + j + 2;
+            skyboxIndices[(__int64)k + 5] = (i + 1) * LongLines + j + 2;
+
+            sphereIndices[(__int64)k + 2] = i * LongLines + j + 1;
+            sphereIndices[(__int64)k + 1] = i * LongLines + j + 2;
+            sphereIndices[k] = (i + 1) * LongLines + j + 1;
+
+            sphereIndices[(__int64)k + 5] = (i + 1) * LongLines + j + 1;
+            sphereIndices[(__int64)k + 4] = i * LongLines + j + 2;
+            sphereIndices[(__int64)k + 3] = (i + 1) * LongLines + j + 2;
 
             k += 6;
         }
 
-        indices[k] = (i * LongLines) + LongLines;
-        indices[(__int64)k + 1] = (i * LongLines) + 1;
-        indices[(__int64)k + 2] = ((i + 1) * LongLines) + LongLines;
+        skyboxIndices[k] = (i * LongLines) + LongLines;
+        skyboxIndices[(__int64)k + 1] = (i * LongLines) + 1;
+        skyboxIndices[(__int64)k + 2] = ((i + 1) * LongLines) + LongLines;
 
-        indices[(__int64)k + 3] = ((i + 1) * LongLines) + LongLines;
-        indices[(__int64)k + 4] = (i * LongLines) + 1;
-        indices[(__int64)k + 5] = ((i + 1) * LongLines) + 1;
+        skyboxIndices[(__int64)k + 3] = ((i + 1) * LongLines) + LongLines;
+        skyboxIndices[(__int64)k + 4] = (i * LongLines) + 1;
+        skyboxIndices[(__int64)k + 5] = ((i + 1) * LongLines) + 1;
+
+        sphereIndices[(__int64)k + 2] = (i * LongLines) + LongLines;
+        sphereIndices[(__int64)k + 1] = (i * LongLines) + 1;
+        sphereIndices[k] = ((i + 1) * LongLines) + LongLines;
+
+        sphereIndices[(__int64)k + 5] = ((i + 1) * LongLines) + LongLines;
+        sphereIndices[(__int64)k + 4] = (i * LongLines) + 1;
+        sphereIndices[(__int64)k + 3] = ((i + 1) * LongLines) + 1;
 
         k += 6;
     }
 
     for (UINT i = 0; i < LongLines - 1; i++) {
-        indices[k] = numVertices - 1;
-        indices[(__int64)k + 2] = (numVertices - 1) - (i + 1);
-        indices[(__int64)k + 1] = (numVertices - 1) - (i + 2);
+        skyboxIndices[k] = numVertices - 1;
+        skyboxIndices[(__int64)k + 2] = (numVertices - 1) - (i + 1);
+        skyboxIndices[(__int64)k + 1] = (numVertices - 1) - (i + 2);
+
+        sphereIndices[(__int64)k + 2] = numVertices - 1;
+        sphereIndices[k] = (numVertices - 1) - (i + 1);
+        sphereIndices[(__int64)k + 1] = (numVertices - 1) - (i + 2);
         k += 3;
     }
 
-    indices[k] = numVertices - 1;
-    indices[(__int64)k + 2] = (numVertices - 1) - LongLines;
-    indices[(__int64)k + 1] = numVertices - 2;
+    skyboxIndices[k] = numVertices - 1;
+    skyboxIndices[(__int64)k + 2] = (numVertices - 1) - LongLines;
+    skyboxIndices[(__int64)k + 1] = numVertices - 2;
+
+    sphereIndices[(__int64)k + 2] = numVertices - 1;
+    sphereIndices[k] = (numVertices - 1) - LongLines;
+    sphereIndices[(__int64)k + 1] = numVertices - 2;
 
     HRESULT result = pGeometryManager_.loadGeometry(&skyboxVertices[0], sizeof(SimpleVertex) * numVertices,
-        &indices[0], sizeof(UINT) * numIndices, "skybox");
+        &skyboxIndices[0], sizeof(UINT) * numIndices, "skybox");
     if (SUCCEEDED(result)) {
         result = pGeometryManager_.loadGeometry(&sphereVertices[0], sizeof(Vertex) * numVertices,
-            &indices[0], sizeof(UINT) * numIndices, "sphere");
+            &sphereIndices[0], sizeof(UINT) * numIndices, "sphere");
     }
 
     return result;
@@ -449,9 +495,9 @@ HRESULT Renderer::InitSkybox() {
 
 HRESULT Renderer::InitObjects() {
     sphere.worldMatrix = DirectX::XMMatrixIdentity();;
-    sphere.color = XMFLOAT3(0.2f, 0.2f, 0.2f);
+    sphere.color = XMFLOAT3(1.0f, 0.71f, 0.29f);
     sphere.metalness = 1.0f;
-    sphere.roughness = 0.0f;
+    sphere.roughness = 0.01f;
     HRESULT result = pGeometryManager_.get("sphere", sphere.geometry);
     if (SUCCEEDED(result)) {
         result = pVSManager_.get("sphere", sphere.VS);
@@ -541,7 +587,34 @@ void Renderer::UpdateImgui() {
     if (window) {
         ImGui::Begin("ImGui", &window);
 
-        std::string str = "Object";
+        std::string str = "Render mode";
+        ImGui::Text(str.c_str());
+
+        static int cur = 0;
+        if (ImGui::Combo("Mode", &cur, "default\0fresnel\0ndf\0geometry")) {
+            switch (cur) {
+            case 0:
+                default_ = true;
+                pPSManager_.get("default", sphere.PS);
+                break;
+            case 1:
+                default_ = false;
+                pPSManager_.get("fresnel", sphere.PS);
+                break;
+            case 2:
+                default_ = false;
+                pPSManager_.get("ndf", sphere.PS);
+                break;
+            case 3:
+                default_ = false;
+                pPSManager_.get("geometry", sphere.PS);
+                break;
+            default:
+                break;
+            }
+        }
+
+        str = "Object";
         ImGui::Text(str.c_str());
 
         static float objCol[3];
@@ -557,12 +630,12 @@ void Renderer::UpdateImgui() {
 
         objRough = sphere.roughness;
         str = "Roughness";
-        ImGui::DragFloat(str.c_str(), &objRough, 0.05f, 0.0f, 1.0f);
+        ImGui::DragFloat(str.c_str(), &objRough, 0.01f, 0.0f, 1.0f);
         sphere.roughness = objRough;
 
         objMetal = sphere.metalness;
         str = "Metalness";
-        ImGui::DragFloat(str.c_str(), &objMetal, 0.05f, 0.0f, 1.0f);
+        ImGui::DragFloat(str.c_str(), &objMetal, 0.01f, 0.0f, 1.0f);
         sphere.metalness = objMetal;
 
         str = "Lights";
@@ -570,7 +643,7 @@ void Renderer::UpdateImgui() {
         ImGui::SameLine();
         if (ImGui::Button("+")) {
             if (lights_.size() < MAX_LIGHT)
-                lights_.push_back({ XMFLOAT4(0.0f, 1.5f, 0.0f, 0.f), XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f) });
+                lights_.push_back({ XMFLOAT4(5.0f, 5.0f, 5.0f, 0.f), XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f) });
         }
         ImGui::SameLine();
         if (ImGui::Button("-")) {
@@ -589,7 +662,7 @@ void Renderer::UpdateImgui() {
             pos[i][1] = lights_[i].pos.y;
             pos[i][2] = lights_[i].pos.z;
             str = "Pos " + std::to_string(i);
-            ImGui::DragFloat3(str.c_str(), pos[i], 0.1f, -5.0f, 5.0f);
+            ImGui::DragFloat3(str.c_str(), pos[i], 0.1f, -15.0f, 15.0f);
             lights_[i].pos = XMFLOAT4(pos[i][0], pos[i][1], pos[i][2], 1.0f);
 
             col[i][0] = lights_[i].color.x;
@@ -601,7 +674,7 @@ void Renderer::UpdateImgui() {
 
             brightness[i] = lights_[i].color.w;
             str = "Brightness " + std::to_string(i);
-            ImGui::DragFloat(str.c_str(), &brightness[i], 10.0f, 1.0f, 10000.0f);
+            ImGui::DragFloat(str.c_str(), &brightness[i], 1.0f, 1.0f, 1000.0f);
             lights_[i].color.w = brightness[i];
         }
 
@@ -625,14 +698,6 @@ bool Renderer::Render() {
 
     pDeviceContext_->ClearState();
 
-    toneMapping_.ClearRenderTarget();
-    toneMapping_.SetRenderTarget();
-
-#ifdef _DEBUG
-    pAnnotation_->EndEvent();
-    pAnnotation_->BeginEvent(L"Setting_everything_necessary");
-#endif
-
     D3D11_VIEWPORT viewport;
     viewport.TopLeftX = 0;
     viewport.TopLeftY = 0;
@@ -650,6 +715,17 @@ bool Renderer::Render() {
     pDeviceContext_->RSSetScissorRects(1, &rect);
 
     ID3D11SamplerState* samplers[] = { pSampler_.get() };
+    static const FLOAT backColor[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
+
+    if (default_) {
+        toneMapping_.ClearRenderTarget();
+        toneMapping_.SetRenderTarget();
+    }
+    else {
+        pDeviceContext_->OMSetRenderTargets(1, &pRenderTargetView_, nullptr);
+        pDeviceContext_->ClearRenderTargetView(pRenderTargetView_, backColor);
+        pDeviceContext_->RSSetViewports(1, &viewport);
+    }
 
 #ifdef _DEBUG
     pAnnotation_->EndEvent();
@@ -666,22 +742,23 @@ bool Renderer::Render() {
 
     RenderObjects();
 
+    if (default_) {
 #ifdef _DEBUG
-    pAnnotation_->EndEvent();
-    pAnnotation_->BeginEvent(L"Tone_mapping");
+        pAnnotation_->EndEvent();
+        pAnnotation_->BeginEvent(L"Tone_mapping");
 #endif
 
-    toneMapping_.RenderBrightness();
+        toneMapping_.RenderBrightness();
 
-    pDeviceContext_->OMSetRenderTargets(1, &pRenderTargetView_, nullptr);
-    pDeviceContext_->PSSetSamplers(0, 1, samplers);
+        pDeviceContext_->OMSetRenderTargets(1, &pRenderTargetView_, nullptr);
+        pDeviceContext_->PSSetSamplers(0, 1, samplers);
 
-    static const FLOAT backColor[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
-    pDeviceContext_->ClearRenderTargetView(pRenderTargetView_, backColor);
+        pDeviceContext_->ClearRenderTargetView(pRenderTargetView_, backColor);
 
-    pDeviceContext_->RSSetViewports(1, &viewport);
+        pDeviceContext_->RSSetViewports(1, &viewport);
 
-    toneMapping_.RenderTonemap();
+        toneMapping_.RenderTonemap();
+    }
 
 #ifdef _DEBUG
     pAnnotation_->EndEvent();

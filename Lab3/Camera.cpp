@@ -4,7 +4,7 @@ Camera::Camera() {
     focus_ = XMFLOAT3(0.0f, 0.0f, 0.0f);
     r_ = 5.0f;
     theta_ = -XM_PIDIV4;
-    phi_ = XM_PIDIV4;
+    phi_ = XM_PIDIV2;
     position_ = XMFLOAT3(focus_.x - cosf(theta_) * cosf(phi_) * r_,
         focus_.y - sinf(theta_) * r_,
         focus_.z - cosf(theta_) * sinf(phi_) * r_);
