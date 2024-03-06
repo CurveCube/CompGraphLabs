@@ -57,15 +57,18 @@ float3 CalculateColor(in float3 objColor, in float3 objNormal, in float3 pos, in
         float G = geometrySmith(objNormal, viewDir, lightDir, roughness);
 #endif
 
-#if defined(DEFAULT)
+#if defined(DEFAULT) || defined(FRESNEL)
         float3 kd = float3(1.0f, 1.0f, 1.0f) - F;
         kd = kd * (1.0f - metalness);
+#endif
 
+#if defined(DEFAULT)
         finalColor += (kd * objColor / pi +
             NDF * G * F / max(4.0f * max(dot(objNormal, viewDir), 0.0f) * max(dot(objNormal, lightDir), 0.0f), 0.0001f)) *
             radiance * max(dot(objNormal, lightDir), 0.0f);
 #elif defined(FRESNEL)
-        finalColor += F;
+        finalColor += (F / max(4.0f * max(dot(objNormal, viewDir), 0.0f) * max(dot(objNormal, lightDir), 0.0f), 0.0001f)) *
+            max(dot(objNormal, lightDir), 0.0f);
 #elif defined(ND)
         finalColor += float3(NDF, NDF, NDF);
 #elif defined(GEOMETRY)
