@@ -183,10 +183,56 @@ HRESULT SimpleTextureManager::loadHDRTexture(const char* filePath, const std::st
     if (check(key))
         return E_FAIL; // Не допускаем перезаписи значения для ключа
 
+    ID3D11Resource* textureResource;
+    ID3D11ShaderResourceView* SRV;
+
     bool b = stbi_is_hdr(filePath);
     int width, height, nrComponents;
     float* data = stbi_loadf(filePath, &width, &height, &nrComponents, 0);
+    if (!data)
+        return E_FAIL;
 
+    HRESULT result = S_OK;
+
+    D3D11_TEXTURE2D_DESC textureDesc = {};
+
+    textureDesc.Width = width;
+    textureDesc.Height = height;
+    textureDesc.MipLevels = 1;
+    textureDesc.ArraySize = 1;
+    textureDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+    textureDesc.SampleDesc.Count = 1;
+    textureDesc.Usage = D3D11_USAGE_DEFAULT;
+    textureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    textureDesc.CPUAccessFlags = 0;
+    textureDesc.MiscFlags = 0;
+
+    D3D11_SUBRESOURCE_DATA initData;
+    initData.pSysMem = data;
+    initData.SysMemPitch = sizeof(float) * width;
+    initData.SysMemSlicePitch = 1;
+
+    ID3D11Texture2D* texture;
+    result = device_.get()->CreateTexture2D(&textureDesc, &initData, &texture);
+
+    if (SUCCEEDED(result))
+    {
+        D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
+        descSRV.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+        descSRV.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+        descSRV.Texture2D.MipLevels = 1;
+        descSRV.Texture2D.MostDetailedMip = 0;
+        result = device_.get()->CreateShaderResourceView(texture, &descSRV, &SRV);
+    }
+
+    textureResource = texture;
+
+    if (SUCCEEDED(result) && annotationText != "") {
+        result = texture->SetPrivateData(WKPDID_D3DDebugObjectName, annotationText.size(), annotationText.c_str());
+    }result = texture->SetPrivateData(WKPDID_D3DDebugObjectName, annotationText.size(), annotationText.c_str());
+    if (SUCCEEDED(result)) {
+        objects_.emplace(key, std::make_shared<SimpleTexture>(textureResource, SRV));
+    }
 
     return S_OK;
 }

@@ -310,6 +310,14 @@ HRESULT Renderer::LoadShaders() {
     if (SUCCEEDED(result)) {
         result = pPSManager_.loadPS(L"toneMapPS.hlsl", nullptr, "tonemap");
     }
+
+    if (SUCCEEDED(result)) {
+        result = pPSManager_.loadPS(L"EnvironmentMapPS.hlsl", nullptr, "environmentMapPS");
+    }
+    if (SUCCEEDED(result)) {
+        result = pVSManager_.loadVS(L"EnvironmentMapVS.hlsl", nullptr, "environmentMapVS",
+            &pILManager_, SimpleVertexDesc, sizeof(SimpleVertexDesc) / sizeof(SimpleVertexDesc[0]));
+    }
     return result;
 }
 
@@ -472,7 +480,11 @@ HRESULT Renderer::LoadTextures() {
     HRESULT result = pTextureManager_.loadCubeMapTexture(L"textures/cube.dds", "cubemap", "CubeMapTextImages");
 #endif
     return result;*/
+#ifndef _DEBUG
     HRESULT result = pTextureManager_.loadHDRTexture("textures/kloofendal_48d_partly_cloudy_puresky_1k.hdr", "hdr");
+#else  // Маркер ресурса для отладочной сборки
+    HRESULT result = pTextureManager_.loadHDRTexture("textures/kloofendal_48d_partly_cloudy_puresky_1k.hdr", "hdr", "HDRTextImages");
+#endif
     return result;
 }
 
