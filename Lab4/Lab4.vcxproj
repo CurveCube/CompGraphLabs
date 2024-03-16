@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -18,10 +18,100 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="brightnessPS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="copyToCubemapPS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="cubemapGeneratorPS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="cubemapGeneratorVS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="CubeMapPS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="CubeMapVS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="downsamplePS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="mappingVS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="PS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="tonemapPS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="VS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="CubemapGenerator.cpp" />
+    <ClCompile Include="D3DInclude.cpp" />
+    <ClCompile Include="DDSTextureLoader11.cpp" />
+    <ClCompile Include="imgui.cpp" />
+    <ClCompile Include="imgui_demo.cpp" />
+    <ClCompile Include="imgui_draw.cpp" />
+    <ClCompile Include="imgui_impl_dx11.cpp" />
+    <ClCompile Include="imgui_impl_win32.cpp" />
+    <ClCompile Include="imgui_tables.cpp" />
+    <ClCompile Include="imgui_widgets.cpp" />
+    <ClCompile Include="Input.cpp" />
+    <ClCompile Include="Lab4.cpp" />
+    <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="SimpleManager.cpp" />
+    <ClCompile Include="ToneMapping.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Camera.h" />
+    <ClInclude Include="CubemapGenerator.h" />
+    <ClInclude Include="D3DInclude.h" />
+    <ClInclude Include="DDSTextureLoader11.h" />
+    <ClInclude Include="framework.h" />
+    <ClInclude Include="imconfig.h" />
+    <ClInclude Include="imgui.h" />
+    <ClInclude Include="imgui_impl_dx11.h" />
+    <ClInclude Include="imgui_impl_win32.h" />
+    <ClInclude Include="imgui_internal.h" />
+    <ClInclude Include="imstb_rectpack.h" />
+    <ClInclude Include="imstb_textedit.h" />
+    <ClInclude Include="imstb_truetype.h" />
+    <ClInclude Include="Input.h" />
+    <ClInclude Include="Lab4.h" />
+    <ClInclude Include="LightCalc.h" />
+    <ClInclude Include="Renderer.h" />
+    <ClInclude Include="Resource.h" />
+    <ClInclude Include="SceneMatrixBuffer.h" />
+    <ClInclude Include="SimpleManager.h" />
+    <ClInclude Include="SimpleObject.h" />
+    <ClInclude Include="Skybox.h" />
+    <ClInclude Include="stb_image.h" />
+    <ClInclude Include="targetver.h" />
+    <ClInclude Include="ToneMapping.h" />
+    <ClInclude Include="Utilities.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="directx.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="imgui.ini" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Lab4.rc" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{2b5db9c3-858c-40c3-8d1f-4a50b81358a3}</ProjectGuid>
+    <ProjectGuid>{6fde571a-6445-436e-b4b5-6456ed57f69c}</ProjectGuid>
     <RootNamespace>Lab4</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
@@ -86,11 +176,11 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
@@ -100,11 +190,11 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -114,7 +204,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
@@ -129,7 +219,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
@@ -140,100 +230,6 @@
       <AdditionalDependencies>dinput8.lib;dxguid.lib;d3d11.lib;dxgi.lib;d3dcompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="Camera.cpp" />
-    <ClCompile Include="D3DInclude.cpp" />
-    <ClCompile Include="DDSTextureLoader11.cpp" />
-    <ClCompile Include="imgui.cpp" />
-    <ClCompile Include="imgui_demo.cpp" />
-    <ClCompile Include="imgui_draw.cpp" />
-    <ClCompile Include="imgui_impl_dx11.cpp" />
-    <ClCompile Include="imgui_impl_win32.cpp" />
-    <ClCompile Include="imgui_tables.cpp" />
-    <ClCompile Include="imgui_widgets.cpp" />
-    <ClCompile Include="Input.cpp" />
-    <ClCompile Include="Lab4.cpp" />
-    <ClCompile Include="Renderer.cpp" />
-    <ClCompile Include="SimpleManager.cpp" />
-    <ClCompile Include="ToneMapping.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="Camera.h" />
-    <ClInclude Include="CubeMap.h" />
-    <ClInclude Include="D3DInclude.h" />
-    <ClInclude Include="DDSTextureLoader11.h" />
-    <ClInclude Include="framework.h" />
-    <ClInclude Include="imconfig.h" />
-    <ClInclude Include="imgui.h" />
-    <ClInclude Include="imgui_impl_dx11.h" />
-    <ClInclude Include="imgui_impl_win32.h" />
-    <ClInclude Include="imgui_internal.h" />
-    <ClInclude Include="imstb_rectpack.h" />
-    <ClInclude Include="imstb_textedit.h" />
-    <ClInclude Include="imstb_truetype.h" />
-    <ClInclude Include="Input.h" />
-    <ClInclude Include="Lab3.h" />
-    <None Include="LightCalc.hlsli">
-      <FileType>Document</FileType>
-    </None>
-    <ClInclude Include="Renderer.h" />
-    <ClInclude Include="Resource.h" />
-    <ClInclude Include="SceneMatrixBuffer.hlsli" />
-    <ClInclude Include="SimpleManager.h" />
-    <ClInclude Include="SimpleObject.h" />
-    <ClInclude Include="Skybox.h" />
-    <ClInclude Include="stb_image.h" />
-    <ClInclude Include="targetver.h" />
-    <ClInclude Include="ToneMapping.h" />
-    <ClInclude Include="Utilities.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="directx.ico" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="imgui.ini" />
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="Lab4.rc" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="brightnessPS.hlsl">
-      <FileType>Document</FileType>
-    </None>
-    <None Include="CubeMapPS.hlsl">
-      <FileType>Document</FileType>
-    </None>
-    <None Include="CubeMapVS.hlsl">
-      <FileType>Document</FileType>
-    </None>
-    <None Include="downsamplePS.hlsl">
-      <FileType>Document</FileType>
-    </None>
-    <None Include="mappingVS.hlsl">
-      <FileType>Document</FileType>
-    </None>
-    <None Include="PS.hlsl">
-      <FileType>Document</FileType>
-    </None>
-    <None Include="tonemapPS.hlsl">
-      <FileType>Document</FileType>
-    </None>
-    <None Include="VS.hlsl">
-      <FileType>Document</FileType>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="EnvironmentMapVS.hlsl">
-      <FileType>Document</FileType>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="EnvorimentMapPS.hlsl">
-      <FileType>Document</FileType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
-    </None>
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

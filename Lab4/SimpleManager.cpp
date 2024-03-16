@@ -29,7 +29,13 @@ HRESULT SimpleVSManager::loadVS(LPCWSTR filePath, const D3D_SHADER_MACRO* macros
 #ifdef _DEBUG // Включение/отключение отладочной информации для шейдеров в зависимости от конфигурации сборки
     flags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 #endif
-    HRESULT result = D3DCompileFromFile(filePath, macros, &includeObj, "main", "vs_5_0", flags, 0, &vertexShaderBuffer, nullptr);
+    ID3DBlob* pErrMsg = nullptr;
+    HRESULT result = D3DCompileFromFile(filePath, macros, &includeObj, "main", "vs_5_0", flags, 0, &vertexShaderBuffer, &pErrMsg);
+    if (!SUCCEEDED(result) && pErrMsg != nullptr)
+    {
+        OutputDebugStringA((const char*)pErrMsg->GetBufferPointer());
+        SAFE_RELEASE(pErrMsg);
+    }
     if (SUCCEEDED(result)) {
         result = device_->CreateVertexShader(vertexShaderBuffer->GetBufferPointer(), vertexShaderBuffer->GetBufferSize(), nullptr, &vertexShader);
     }
@@ -58,7 +64,13 @@ HRESULT SimplePSManager::loadPS(LPCWSTR filePath, const D3D_SHADER_MACRO* macros
 #ifdef _DEBUG // Включение/отключение отладочной информации для шейдеров в зависимости от конфигурации сборки
     flags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 #endif
-    HRESULT result = D3DCompileFromFile(filePath, macros, &includeObj, "main", "ps_5_0", flags, 0, &pixelShaderBuffer, nullptr);
+    ID3DBlob* pErrMsg = nullptr;
+    HRESULT result = D3DCompileFromFile(filePath, macros, &includeObj, "main", "ps_5_0", flags, 0, &pixelShaderBuffer, &pErrMsg);
+    if (!SUCCEEDED(result) && pErrMsg != nullptr)
+    {
+        OutputDebugStringA((const char*)pErrMsg->GetBufferPointer());
+        SAFE_RELEASE(pErrMsg);
+    }
     if (SUCCEEDED(result)) {
         result = device_->CreatePixelShader(pixelShaderBuffer->GetBufferPointer(), pixelShaderBuffer->GetBufferSize(), nullptr, &pixelShader);
     }
@@ -185,10 +197,10 @@ HRESULT SimpleTextureManager::loadHDRTexture(const char* filePath, const std::st
 
     ID3D11Resource* textureResource;
     ID3D11ShaderResourceView* SRV;
-
+    //stbi_set_flip_vertically_on_load(true);
     bool b = stbi_is_hdr(filePath);
     int width, height, nrComponents;
-    float* data = stbi_loadf(filePath, &width, &height, &nrComponents, 0);
+    float* data = stbi_loadf(filePath, &width, &height, &nrComponents, 4);
     if (!data)
         return E_FAIL;
 
@@ -209,8 +221,8 @@ HRESULT SimpleTextureManager::loadHDRTexture(const char* filePath, const std::st
 
     D3D11_SUBRESOURCE_DATA initData;
     initData.pSysMem = data;
-    initData.SysMemPitch = sizeof(float) * width;
-    initData.SysMemSlicePitch = 1;
+    initData.SysMemPitch = width * sizeof(float) * 4;
+    initData.SysMemSlicePitch = width * height * sizeof(float) * 4;
 
     ID3D11Texture2D* texture;
     result = device_.get()->CreateTexture2D(&textureDesc, &initData, &texture);
@@ -233,6 +245,8 @@ HRESULT SimpleTextureManager::loadHDRTexture(const char* filePath, const std::st
     if (SUCCEEDED(result)) {
         objects_.emplace(key, std::make_shared<SimpleTexture>(textureResource, SRV));
     }
+
+    stbi_image_free(data);
 
     return S_OK;
 }

@@ -1,7 +1,7 @@
 ﻿// Lab2.cpp : Определяет точку входа для приложения.
 //
 
-#include "Lab3.h"
+#include "Lab4.h"
 #include "Renderer.h"
 
 #define MAX_LOADSTRING 100
@@ -23,7 +23,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE     hInstance,
 
     // Инициализация глобальных строк
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
-    LoadStringW(hInstance, IDC_LAB3, szWindowClass, MAX_LOADSTRING);
+    LoadStringW(hInstance, IDI_LAB4, szWindowClass, MAX_LOADSTRING);
     MyRegisterClass(hInstance);
 
     std::wstring dir;
@@ -75,7 +75,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance) {
     wcex.cbClsExtra      = 0;
     wcex.cbWndExtra      = 0;
     wcex.hInstance       = hInstance;
-    wcex.hIcon           = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_LAB3));
+    wcex.hIcon           = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_LAB4));
     wcex.hCursor         = LoadCursor(nullptr, IDC_ARROW);
     wcex.hbrBackground   = (HBRUSH)(COLOR_WINDOW+1);
     wcex.lpszMenuName    = nullptr;

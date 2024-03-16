@@ -1,4 +1,4 @@
-#include "LightCalc.hlsli"
+#include "LightCalc.h"
 
 cbuffer WorldMatrixBuffer : register (b0) {
     float4x4 worldMatrix;

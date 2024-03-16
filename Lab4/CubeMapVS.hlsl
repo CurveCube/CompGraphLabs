@@ -1,4 +1,4 @@
-#include "SceneMatrixBuffer.hlsli"
+#include "SceneMatrixBuffer.h"
 
 cbuffer WorldMatrixBuffer : register (b0) {
     float4x4 worldMatrix;

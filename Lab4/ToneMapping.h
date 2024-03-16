@@ -47,7 +47,7 @@ private:
 private:
     std::shared_ptr <ID3D11Device> m_device;
     std::shared_ptr <ID3D11DeviceContext> m_deviceContext;
-     
+
     Texture m_frame;
     int n = 0;
 

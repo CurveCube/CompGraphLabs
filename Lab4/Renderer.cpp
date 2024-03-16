@@ -107,6 +107,12 @@ bool Renderer::Init(HINSTANCE hInstance, HWND hWnd) {
         Cleanup();
     }
 
+    if (SUCCEEDED(result)) {
+        result = cubemapGenerator_.generate(pDevice_, pDeviceContext_, pSamplerManager_, pTextureManager_, pILManager_, pPSManager_, pVSManager_, pGeometryManager_);
+        cubemapGenerator_.getCubemapTexture(skybox.texture);
+        //cubemapGenerator_.Cleanup();
+    }
+
     return SUCCEEDED(result);
 }
 
@@ -310,13 +316,15 @@ HRESULT Renderer::LoadShaders() {
     if (SUCCEEDED(result)) {
         result = pPSManager_.loadPS(L"toneMapPS.hlsl", nullptr, "tonemap");
     }
-
     if (SUCCEEDED(result)) {
-        result = pPSManager_.loadPS(L"EnvironmentMapPS.hlsl", nullptr, "environmentMapPS");
+        result = pPSManager_.loadPS(L"cubemapGeneratorPS.hlsl", nullptr, "cubemapGenerator");
     }
     if (SUCCEEDED(result)) {
-        result = pVSManager_.loadVS(L"EnvironmentMapVS.hlsl", nullptr, "environmentMapVS",
+        result = pVSManager_.loadVS(L"cubemapGeneratorVS.hlsl", nullptr, "cubemapGenerator",
             &pILManager_, SimpleVertexDesc, sizeof(SimpleVertexDesc) / sizeof(SimpleVertexDesc[0]));
+    }
+    if (SUCCEEDED(result)) {
+        result = pPSManager_.loadPS(L"copyToCubemapPS.hlsl", nullptr, "copyToCubemapPS");
     }
     return result;
 }
@@ -473,17 +481,17 @@ HRESULT Renderer::LoadGeometry() {
 
 HRESULT Renderer::LoadTextures() {
     pTextureManager_.setDevice(pDevice_);
+    HRESULT result;
+//#ifndef _DEBUG
+//    result = pTextureManager_.loadCubeMapTexture(L"textures/cube.dds", "cubemap");
+//#else  // Маркер ресурса для отладочной сборки
+//    result = pTextureManager_.loadCubeMapTexture(L"textures/cube.dds", "cubemap", "CubeMapTextImages");
+//#endif
 
-/*#ifndef _DEBUG
-    HRESULT result = pTextureManager_.loadCubeMapTexture(L"textures/cube.dds", "cubemap");
-#else  // Маркер ресурса для отладочной сборки
-    HRESULT result = pTextureManager_.loadCubeMapTexture(L"textures/cube.dds", "cubemap", "CubeMapTextImages");
-#endif
-    return result;*/
 #ifndef _DEBUG
-    HRESULT result = pTextureManager_.loadHDRTexture("textures/kloofendal_48d_partly_cloudy_puresky_1k.hdr", "hdr");
+    result = pTextureManager_.loadHDRTexture("textures/kloofendal_48d_partly_cloudy_puresky_1k.hdr", "hdr");
 #else  // Маркер ресурса для отладочной сборки
-    HRESULT result = pTextureManager_.loadHDRTexture("textures/kloofendal_48d_partly_cloudy_puresky_1k.hdr", "hdr", "HDRTextImages");
+    result = pTextureManager_.loadHDRTexture("textures/hdr_text.hdr", "hdr", "HDRTextImages");
 #endif
     return result;
 }
@@ -502,7 +510,8 @@ HRESULT Renderer::InitSkybox() {
         result = pPSManager_.get("skybox", skybox.PS);
     }
     if (SUCCEEDED(result)) {
-        result = pTextureManager_.get("cubemap", skybox.texture);
+        //result = pTextureManager_.get("cubemap", skybox.texture);
+        
     }
     return result;
 }
@@ -896,6 +905,7 @@ void Renderer::Cleanup() {
     pPSManager_.Cleanup();
     pTextureManager_.Cleanup();
     pSamplerManager_.Cleanup();
+    cubemapGenerator_.Cleanup();
 
     SAFE_RELEASE(pRenderTargetView_);
     SAFE_RELEASE(pSwapChain_);

@@ -6,6 +6,7 @@
 #include "Skybox.h"
 #include "SimpleObject.h"
 #include "ToneMapping.h"
+#include "CubemapGenerator.h"
 #include <vector>
 #include <string>
 
@@ -114,5 +115,6 @@ private:
     UINT height_;
 
     ToneMapping toneMapping_;
+    CubemapGenerator cubemapGenerator_;
     bool default_ = true;
 };

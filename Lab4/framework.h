@@ -16,6 +16,8 @@
 
 #define DIRECTINPUT_VERSION 0x0800
 
+#define SAFE_RELEASE(A) if ((A) != NULL) { (A)->Release(); (A) = NULL; }
+
 #include <d3dcompiler.h>
 #include <dxgi.h>
 #include <d3d11.h>
