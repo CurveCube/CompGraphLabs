@@ -34,7 +34,6 @@ struct ViewMatrixBuffer {
     XMFLOAT4 cameraPos;
     XMINT4 lightParams;
     Light lights[MAX_LIGHT];
-    XMFLOAT4 ambientColor;
 };
 
 class Renderer {

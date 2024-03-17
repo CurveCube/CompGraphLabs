@@ -8,7 +8,7 @@
 class CubemapGenerator
 {
     static const UINT sideSize = 512;
-    static const UINT irradianceSideSize = 32;
+    static const UINT irradianceSideSize = 64;
 
     struct SimpleVertex {
         XMFLOAT3 pos;
@@ -19,36 +19,46 @@ class CubemapGenerator
     };
 
 public:
-    CubemapGenerator(std::shared_ptr<ID3D11Device>& device, std::shared_ptr <ID3D11DeviceContext>& deviceContext);
+    CubemapGenerator(std::shared_ptr<ID3D11Device>&, std::shared_ptr <ID3D11DeviceContext>&,
+        SimpleSamplerManager&, SimpleTextureManager&,
+        SimpleILManager&, SimplePSManager&,
+        SimpleVSManager&, SimpleGeometryManager&);
 
-    HRESULT generateCubeMap(SimpleSamplerManager&, SimpleTextureManager&,
-        SimpleILManager&, SimplePSManager&, 
-        SimpleVSManager&, SimpleGeometryManager&,
-        const std::string&);
+    HRESULT init();
+
+    HRESULT generateCubeMap(const std::string&);
+    HRESULT generateIrradianceMap(const std::string&, const std::string&);
 
     void Cleanup();
 
     ~CubemapGenerator() {
         Cleanup();
+        SAFE_RELEASE(pCameraBuffer);
     }
 
 private:
-    HRESULT createHdrMappedTexture();
-    HRESULT createCubemapTexture(SimpleTextureManager&, const std::string&);
+    HRESULT createTexture(UINT);
+    HRESULT createCubemapTexture(UINT, const std::string&);
     HRESULT createBuffer();
-    HRESULT renderToCubeMap(SimplePSManager&, SimpleVSManager&, SimpleSamplerManager&, int);
-    HRESULT createGeometry(SimpleGeometryManager&);
-    HRESULT renderSubHdr(SimplePSManager&, SimpleVSManager&, 
-        SimpleSamplerManager&, SimpleTextureManager&, 
-        SimpleILManager&, SimpleGeometryManager&, int);
+    HRESULT renderToCubeMap(UINT, int);
+    HRESULT createGeometry();
+    HRESULT renderMapSide(int);
+    HRESULT renderIrradianceMapSide(const std::string&, int);
 
 private:
     std::shared_ptr<ID3D11Device> device_;
     std::shared_ptr <ID3D11DeviceContext> deviceContext_;
 
-    ID3D11Texture2D* subHdrMappedTexture = nullptr;
-    ID3D11RenderTargetView* subHdrMappedRTV = nullptr;
-    ID3D11ShaderResourceView* subHdrMappedSRV = nullptr;
+    SimpleSamplerManager& samplerManager_;
+    SimpleTextureManager& textureManager_;
+    SimpleILManager& ILManager_;
+    SimplePSManager& PSManager_;
+    SimpleVSManager& VSManager_;
+    SimpleGeometryManager& GManager_;
+
+    ID3D11Texture2D* subTexture = nullptr;
+    ID3D11RenderTargetView* subRTV = nullptr;
+    ID3D11ShaderResourceView* subSRV = nullptr;
     ID3D11RenderTargetView* cubemapRTV[6] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
     ID3D11Buffer* pCameraBuffer = nullptr;
 

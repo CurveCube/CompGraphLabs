@@ -1,7 +1,18 @@
 #include "CubemapGenerator.h"
 
-CubemapGenerator::CubemapGenerator(std::shared_ptr<ID3D11Device>& device, std::shared_ptr <ID3D11DeviceContext>& deviceContext) :
-    device_(device), deviceContext_(deviceContext)
+CubemapGenerator::CubemapGenerator(
+    std::shared_ptr<ID3D11Device>& device,
+    std::shared_ptr <ID3D11DeviceContext>& deviceContext,
+    SimpleSamplerManager& samplerManager,
+    SimpleTextureManager& textureManager,
+    SimpleILManager& ILManager,
+    SimplePSManager& PSManager,
+    SimpleVSManager& VSManager,
+    SimpleGeometryManager& GManager
+) : device_(device), deviceContext_(deviceContext),
+    samplerManager_(samplerManager), textureManager_(textureManager),
+    ILManager_(ILManager), PSManager_(PSManager),
+    VSManager_(VSManager), GManager_(GManager)
 {
     viewMatrices = {
         DirectX::XMMatrixLookToLH(
@@ -39,34 +50,52 @@ CubemapGenerator::CubemapGenerator(std::shared_ptr<ID3D11Device>& device, std::s
     sides = { "X+", "X-", "Y+", "Y-", "Z+", "Z-" };
 }
 
-HRESULT CubemapGenerator::generateCubeMap(
-    SimpleSamplerManager& samplerManager, 
-    SimpleTextureManager& textureManager,
-    SimpleILManager& ILManager, 
-    SimplePSManager& PSManager, 
-    SimpleVSManager& VSManager, 
-    SimpleGeometryManager& GManager,
+HRESULT CubemapGenerator::init()
+{
+    HRESULT  result = createGeometry();
+    if (SUCCEEDED(result)) {
+        result = createBuffer();
+    }
+    return result;
+}
+
+HRESULT CubemapGenerator::generateCubeMap(const std::string& key)
+{
+    Cleanup();
+
+    HRESULT result = createTexture(sideSize);
+    if (SUCCEEDED(result)) {
+        result = createCubemapTexture(sideSize, key);
+    }
+
+    for (int i = 0; i < 6 && SUCCEEDED(result); i++)
+    {
+        result = renderMapSide(i);
+        if (SUCCEEDED(result)) {
+            result = renderToCubeMap(sideSize, i);
+        }
+    }
+
+    return result;
+}
+
+HRESULT CubemapGenerator::generateIrradianceMap(
+    const std::string& hdrCubeMapKey,
     const std::string& key
 )
 {
     Cleanup();
 
-    HRESULT result = createHdrMappedTexture();
+    HRESULT result = createTexture(irradianceSideSize);
     if (SUCCEEDED(result)) {
-        result = createCubemapTexture(textureManager, key);
-    }
-    if (SUCCEEDED(result)) {
-        result = createGeometry(GManager);
-    }
-    if (SUCCEEDED(result)) {
-        result = createBuffer();
+        result = createCubemapTexture(irradianceSideSize, key);
     }
 
     for (int i = 0; i < 6 && SUCCEEDED(result); i++)
     {
-        result = renderSubHdr(PSManager, VSManager, samplerManager, textureManager, ILManager, GManager, i);
+        result = renderIrradianceMapSide(hdrCubeMapKey, i);
         if (SUCCEEDED(result)) {
-            result = renderToCubeMap(PSManager, VSManager, samplerManager, i);
+            result = renderToCubeMap(irradianceSideSize, i);
         }
     }
 
@@ -75,22 +104,21 @@ HRESULT CubemapGenerator::generateCubeMap(
 
 void CubemapGenerator::Cleanup()
 {
-    SAFE_RELEASE(subHdrMappedTexture);
-    SAFE_RELEASE(subHdrMappedRTV);
-    SAFE_RELEASE(subHdrMappedSRV);
+    SAFE_RELEASE(subTexture);
+    SAFE_RELEASE(subRTV);
+    SAFE_RELEASE(subSRV);
     for (int i = 0; i < 6; ++i)
         SAFE_RELEASE(cubemapRTV[i]);
-    SAFE_RELEASE(pCameraBuffer);
 }
 
-HRESULT CubemapGenerator::createHdrMappedTexture()
+HRESULT CubemapGenerator::createTexture(UINT size)
 {
     HRESULT result;
     {
         D3D11_TEXTURE2D_DESC textureDesc = {};
 
-        textureDesc.Width = sideSize;
-        textureDesc.Height = sideSize;
+        textureDesc.Width = size;
+        textureDesc.Height = size;
         textureDesc.MipLevels = 1;
         textureDesc.ArraySize = 1;
         textureDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
@@ -100,7 +128,7 @@ HRESULT CubemapGenerator::createHdrMappedTexture()
         textureDesc.CPUAccessFlags = 0;
         textureDesc.MiscFlags = 0;
 
-        result = device_->CreateTexture2D(&textureDesc, NULL, &subHdrMappedTexture);
+        result = device_->CreateTexture2D(&textureDesc, nullptr, &subTexture);
     }
 
     if (SUCCEEDED(result))
@@ -110,7 +138,7 @@ HRESULT CubemapGenerator::createHdrMappedTexture()
         renderTargetViewDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
         renderTargetViewDesc.Texture2D.MipSlice = 0;
 
-        result = device_->CreateRenderTargetView(subHdrMappedTexture, &renderTargetViewDesc, &subHdrMappedRTV);
+        result = device_->CreateRenderTargetView(subTexture, &renderTargetViewDesc, &subRTV);
     }
 
     if (SUCCEEDED(result))
@@ -121,7 +149,7 @@ HRESULT CubemapGenerator::createHdrMappedTexture()
         shaderResourceViewDesc.Texture2D.MostDetailedMip = 0;
         shaderResourceViewDesc.Texture2D.MipLevels = 1;
 
-        result = device_->CreateShaderResourceView(subHdrMappedTexture, &shaderResourceViewDesc, &subHdrMappedSRV);
+        result = device_->CreateShaderResourceView(subTexture, &shaderResourceViewDesc, &subSRV);
     }
 
     return result;
@@ -148,7 +176,7 @@ HRESULT CubemapGenerator::createBuffer()
     return device_->CreateBuffer(&desc, &data, &pCameraBuffer);
 }
 
-HRESULT CubemapGenerator::createCubemapTexture(SimpleTextureManager& textureManager, const std::string& key)
+HRESULT CubemapGenerator::createCubemapTexture(UINT size, const std::string& key)
 {
     ID3D11Texture2D* cubemapTexture = nullptr;
     ID3D11ShaderResourceView* cubemapSRV = nullptr;
@@ -156,8 +184,8 @@ HRESULT CubemapGenerator::createCubemapTexture(SimpleTextureManager& textureMana
     {
         D3D11_TEXTURE2D_DESC textureDesc = {};
 
-        textureDesc.Width = sideSize;
-        textureDesc.Height = sideSize;
+        textureDesc.Width = size;
+        textureDesc.Height = size;
         textureDesc.MipLevels = 0;
         textureDesc.ArraySize = 6;
         textureDesc.SampleDesc.Count = 1;
@@ -199,42 +227,38 @@ HRESULT CubemapGenerator::createCubemapTexture(SimpleTextureManager& textureMana
 
     if (SUCCEEDED(result))
     {
-        textureManager.setDevice(device_);
-        textureManager.setDeviceContext(deviceContext_);
-        result = textureManager.loadTexture(cubemapTexture, cubemapSRV, key);
+        textureManager_.setDevice(device_);
+        textureManager_.setDeviceContext(deviceContext_);
+        result = textureManager_.loadTexture(cubemapTexture, cubemapSRV, key);
     }
 
     return result;
 }
 
-HRESULT CubemapGenerator::renderToCubeMap(
-    SimplePSManager& PSManager, 
-    SimpleVSManager& VSManager,
-    SimpleSamplerManager& samplerManager,
-    int num)
+HRESULT CubemapGenerator::renderToCubeMap(UINT size, int num)
 {
     deviceContext_->OMSetRenderTargets(1, &cubemapRTV[num], nullptr);
 
     std::shared_ptr<ID3D11PixelShader> ps;
     std::shared_ptr<ID3D11VertexShader> vs;
-    HRESULT result = PSManager.get("copyToCubemapPS", ps);
+    HRESULT result = PSManager_.get("copyToCubemapPS", ps);
     if (!SUCCEEDED(result))
         return result;
-    result = VSManager.get("mapping", vs);
+    result = VSManager_.get("mapping", vs);
     if (!SUCCEEDED(result))
         return result;
 
     D3D11_VIEWPORT viewport;
     viewport.TopLeftX = 0;
     viewport.TopLeftY = 0;
-    viewport.Width = sideSize;
-    viewport.Height = sideSize;
+    viewport.Width = size;
+    viewport.Height = size;
     viewport.MinDepth = 0.0f;
     viewport.MaxDepth = 1.0f;
     deviceContext_->RSSetViewports(1, &viewport);
 
     std::shared_ptr<ID3D11SamplerState> sampler;
-    result = samplerManager.get("default", sampler);
+    result = samplerManager_.get("default", sampler);
     if (!SUCCEEDED(result))
         return result;
 
@@ -244,7 +268,7 @@ HRESULT CubemapGenerator::renderToCubeMap(
     deviceContext_->PSSetSamplers(0, 1, samplers);
 
     ID3D11ShaderResourceView* resources[] = {
-        subHdrMappedSRV
+        subSRV
     };
     deviceContext_->PSSetShaderResources(0, 1, resources);
     deviceContext_->OMSetDepthStencilState(nullptr, 0);
@@ -256,12 +280,15 @@ HRESULT CubemapGenerator::renderToCubeMap(
     deviceContext_->PSSetShader(ps.get(), nullptr, 0);
     deviceContext_->Draw(6, 0);
 
+    resources[0] = nullptr;
+    deviceContext_->PSSetShaderResources(0, 1, resources);
+
     return result;
 }
 
-HRESULT CubemapGenerator::createGeometry(SimpleGeometryManager& GManager)
+HRESULT CubemapGenerator::createGeometry()
 {
-    GManager.setDevice(device_);
+    GManager_.setDevice(device_);
 
     SimpleVertex geometryXplus[] = { XMFLOAT3(0.5f, -0.5f, 0.5f),
                                     XMFLOAT3(0.5f, -0.5f, -0.5f),
@@ -269,7 +296,7 @@ HRESULT CubemapGenerator::createGeometry(SimpleGeometryManager& GManager)
                                     XMFLOAT3(0.5f, 0.5f, 0.5f) };
     UINT indicesXplus[] = { 3, 2, 1, 0, 3, 1 };
 
-    HRESULT result = GManager.loadGeometry(geometryXplus, sizeof(XMFLOAT3) * 4, indicesXplus, sizeof(UINT) * 6, "X+");
+    HRESULT result = GManager_.loadGeometry(geometryXplus, sizeof(XMFLOAT3) * 4, indicesXplus, sizeof(UINT) * 6, "X+");
     if (!SUCCEEDED(result))
         return result;
 
@@ -279,7 +306,7 @@ HRESULT CubemapGenerator::createGeometry(SimpleGeometryManager& GManager)
                                 XMFLOAT3(-0.5f, 0.5f, 0.5f) };
     UINT indicesXminus[] = { 0, 1, 2, 3, 0, 2 };
 
-    result = GManager.loadGeometry(geometryXminus, sizeof(XMFLOAT3) * 4, indicesXminus, sizeof(UINT) * 6, "X-");
+    result = GManager_.loadGeometry(geometryXminus, sizeof(XMFLOAT3) * 4, indicesXminus, sizeof(UINT) * 6, "X-");
     if (!SUCCEEDED(result))
         return result;
 
@@ -289,7 +316,7 @@ HRESULT CubemapGenerator::createGeometry(SimpleGeometryManager& GManager)
                                 XMFLOAT3(0.5f, 0.5f, 0.5f) };
     UINT indicesYplus[] = { 3, 0, 2, 1, 3, 2 };
 
-    result = GManager.loadGeometry(geometryYplus, sizeof(XMFLOAT3) * 4, indicesYplus, sizeof(UINT) * 6, "Y+");
+    result = GManager_.loadGeometry(geometryYplus, sizeof(XMFLOAT3) * 4, indicesYplus, sizeof(UINT) * 6, "Y+");
     if (!SUCCEEDED(result))
         return result;
 
@@ -299,7 +326,7 @@ HRESULT CubemapGenerator::createGeometry(SimpleGeometryManager& GManager)
                                 XMFLOAT3(0.5f, -0.5f, 0.5f) };
     UINT indicesYminus[] = { 3, 1, 2, 0, 3, 2 };
 
-    result = GManager.loadGeometry(geometryYminus, sizeof(XMFLOAT3) * 4, indicesYminus, sizeof(UINT) * 6, "Y-");
+    result = GManager_.loadGeometry(geometryYminus, sizeof(XMFLOAT3) * 4, indicesYminus, sizeof(UINT) * 6, "Y-");
     if (!SUCCEEDED(result))
         return result;
 
@@ -309,7 +336,7 @@ HRESULT CubemapGenerator::createGeometry(SimpleGeometryManager& GManager)
                             XMFLOAT3(-0.5f, -0.5f, 0.5f) };
     UINT indicesZplus[] = { 0, 1, 2, 3, 0, 2 };
 
-    result = GManager.loadGeometry(geometryZplus, sizeof(XMFLOAT3) * 4, indicesZplus, sizeof(UINT) * 6, "Z+");
+    result = GManager_.loadGeometry(geometryZplus, sizeof(XMFLOAT3) * 4, indicesZplus, sizeof(UINT) * 6, "Z+");
     if (!SUCCEEDED(result))
         return result;
 
@@ -319,26 +346,20 @@ HRESULT CubemapGenerator::createGeometry(SimpleGeometryManager& GManager)
                                 XMFLOAT3(0.5f, 0.5f, -0.5f) };
     UINT indicesZminus[] = { 1, 3, 2, 0, 1, 2 };
 
-    result = GManager.loadGeometry(geometryZminus, sizeof(XMFLOAT3) * 4, indicesZminus, sizeof(UINT) * 6, "Z-");
+    result = GManager_.loadGeometry(geometryZminus, sizeof(XMFLOAT3) * 4, indicesZminus, sizeof(UINT) * 6, "Z-");
 
     return result;
 }
 
-HRESULT CubemapGenerator::renderSubHdr(
-    SimplePSManager& PSManager,
-    SimpleVSManager& VSManager,
-    SimpleSamplerManager& samplerManager,
-    SimpleTextureManager& textureManager,
-    SimpleILManager& ILManager,
-    SimpleGeometryManager& GManager,
-    int num
-)
+HRESULT CubemapGenerator::renderMapSide(int num)
 {
     static const FLOAT backColor[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
-    deviceContext_->ClearRenderTargetView(subHdrMappedRTV, backColor);
+    deviceContext_->ClearRenderTargetView(subRTV, backColor);
+
+    deviceContext_->OMSetRenderTargets(1, &subRTV, nullptr);
 
     std::shared_ptr<SimpleTexture> hdrText;
-    HRESULT result = textureManager.get("hdr", hdrText);
+    HRESULT result = textureManager_.get("hdr", hdrText);
     if (!SUCCEEDED(result))
         return result;
 
@@ -348,10 +369,8 @@ HRESULT CubemapGenerator::renderSubHdr(
 
     deviceContext_->PSSetShaderResources(0, 1, resources);
 
-    deviceContext_->OMSetRenderTargets(1, &subHdrMappedRTV, nullptr);
-
     std::shared_ptr<ID3D11SamplerState> sampler;
-    result = samplerManager.get("default", sampler);
+    result = samplerManager_.get("default", sampler);
     if (!SUCCEEDED(result))
         return result;
 
@@ -362,10 +381,10 @@ HRESULT CubemapGenerator::renderSubHdr(
 
     std::shared_ptr<ID3D11PixelShader> ps;
     std::shared_ptr<ID3D11VertexShader> vs;
-    result = PSManager.get("cubemapGenerator", ps);
+    result = PSManager_.get("cubemapGenerator", ps);
     if (!SUCCEEDED(result))
         return result;
-    result = VSManager.get("cubemapGenerator", vs);
+    result = VSManager_.get("cubemapGenerator", vs);
     if (!SUCCEEDED(result))
         return result;
 
@@ -379,7 +398,7 @@ HRESULT CubemapGenerator::renderSubHdr(
     deviceContext_->RSSetViewports(1, &viewport);
 
     std::shared_ptr<Geometry> geom;
-    result = GManager.get(sides[num], geom);
+    result = GManager_.get(sides[num], geom);
     if (!SUCCEEDED(result))
         return result;
 
@@ -389,7 +408,87 @@ HRESULT CubemapGenerator::renderSubHdr(
         deviceContext_->UpdateSubresource(pCameraBuffer, 0, nullptr, &cameraBuffer, 0, 0);
     }
     std::shared_ptr<ID3D11InputLayout> il;
-    result = ILManager.get("cubemapGenerator", il);
+    result = ILManager_.get("cubemapGenerator", il);
+    if (!SUCCEEDED(result))
+        return result;
+    deviceContext_->IASetInputLayout(il.get());
+    ID3D11Buffer* vertexBuffers[] = { geom->getVertexBuffer() };
+    UINT strides[] = { sizeof(SimpleVertex) };
+    UINT offsets[] = { 0 };
+    deviceContext_->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
+    deviceContext_->IASetIndexBuffer(geom->getIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
+    deviceContext_->OMSetDepthStencilState(nullptr, 0);
+    deviceContext_->RSSetState(nullptr);
+    deviceContext_->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+
+    deviceContext_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    deviceContext_->VSSetShader(vs.get(), nullptr, 0);
+    deviceContext_->VSSetConstantBuffers(0, 1, &pCameraBuffer);
+    deviceContext_->PSSetShader(ps.get(), nullptr, 0);
+
+    deviceContext_->DrawIndexed(6, 0, 0);
+
+    return result;
+}
+
+HRESULT CubemapGenerator::renderIrradianceMapSide(const std::string& hdrCubeMapKey, int num)
+{
+    static const FLOAT backColor[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
+    deviceContext_->ClearRenderTargetView(subRTV, backColor);
+
+    deviceContext_->OMSetRenderTargets(1, &subRTV, nullptr);
+
+    std::shared_ptr<SimpleTexture> hdrCubeMap;
+    HRESULT result = textureManager_.get(hdrCubeMapKey, hdrCubeMap);
+    if (!SUCCEEDED(result))
+        return result;
+
+    ID3D11ShaderResourceView* resources[] = {
+        hdrCubeMap->getSRV()
+    };
+
+    deviceContext_->PSSetShaderResources(0, 1, resources);
+
+    std::shared_ptr<ID3D11SamplerState> sampler;
+    result = samplerManager_.get("default", sampler);
+    if (!SUCCEEDED(result))
+        return result;
+
+    ID3D11SamplerState* samplers[] = {
+        sampler.get()
+    };
+    deviceContext_->PSSetSamplers(0, 1, samplers);
+
+    std::shared_ptr<ID3D11PixelShader> ps;
+    std::shared_ptr<ID3D11VertexShader> vs;
+    result = PSManager_.get("cubemapGeneratorIrradiance", ps);
+    if (!SUCCEEDED(result))
+        return result;
+    result = VSManager_.get("cubemapGenerator", vs);
+    if (!SUCCEEDED(result))
+        return result;
+
+    D3D11_VIEWPORT viewport;
+    viewport.TopLeftX = 0;
+    viewport.TopLeftY = 0;
+    viewport.Width = irradianceSideSize;
+    viewport.Height = irradianceSideSize;
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+    deviceContext_->RSSetViewports(1, &viewport);
+
+    std::shared_ptr<Geometry> geom;
+    result = GManager_.get(sides[num], geom);
+    if (!SUCCEEDED(result))
+        return result;
+
+    if (SUCCEEDED(result)) {
+        CameraBuffer cameraBuffer;
+        cameraBuffer.viewProjMatrix = DirectX::XMMatrixMultiply(viewMatrices[num], projectionMatrix);
+        deviceContext_->UpdateSubresource(pCameraBuffer, 0, nullptr, &cameraBuffer, 0, 0);
+    }
+    std::shared_ptr<ID3D11InputLayout> il;
+    result = ILManager_.get("cubemapGenerator", il);
     if (!SUCCEEDED(result))
         return result;
     deviceContext_->IASetInputLayout(il.get());

@@ -8,14 +8,14 @@ struct VS_INPUT {
 
 struct PS_INPUT {
     float4 position : SV_POSITION;
-    float4 worldPos : POSITION;
+    float3 localPos : POSITION;
 };
 
 PS_INPUT main(VS_INPUT input) {
     PS_INPUT output;
 
     output.position = mul(viewProjectionMatrix, float4(input.position, 1.0f));
-    output.worldPos = float4(input.position, 1.0f); 
+    output.localPos = input.position;
 
     return output;
 }

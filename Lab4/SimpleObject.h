@@ -24,12 +24,14 @@ struct SimpleObject {
     std::shared_ptr<ID3D11InputLayout> IL;
     std::shared_ptr<ID3D11PixelShader> PS;
     std::shared_ptr<Geometry> geometry;
+    std::shared_ptr<SimpleTexture> irradianceMap;
 
     void Cleanup() {
         VS.reset();
         PS.reset();
         IL.reset();
         geometry.reset();
+        irradianceMap.reset();
     };
 
     ~SimpleObject() = default;

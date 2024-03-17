@@ -8,5 +8,4 @@ cbuffer SceneMatrixBuffer : register (b1) {
     float4 cameraPos;
     int4 lightParams;
     LIGHT lights[10];
-    float4 ambientColor;
 };

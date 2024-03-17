@@ -314,6 +314,9 @@ HRESULT Renderer::LoadShaders() {
         result = pPSManager_.loadPS(L"cubemapGeneratorPS.hlsl", nullptr, "cubemapGenerator");
     }
     if (SUCCEEDED(result)) {
+        result = pPSManager_.loadPS(L"cubemapGeneratorIrradiancePS.hlsl", nullptr, "cubemapGeneratorIrradiance");
+    }
+    if (SUCCEEDED(result)) {
         result = pVSManager_.loadVS(L"cubemapGeneratorVS.hlsl", nullptr, "cubemapGenerator",
             &pILManager_, SimpleVertexDesc, sizeof(SimpleVertexDesc) / sizeof(SimpleVertexDesc[0]));
     }
@@ -484,9 +487,15 @@ HRESULT Renderer::LoadTextures() {
 #endif
 
     if (SUCCEEDED(result)) {
-        CubemapGenerator cubeMapGen(pDevice_, pDeviceContext_);
-        result = cubeMapGen.generateCubeMap(pSamplerManager_, pTextureManager_, pILManager_, pPSManager_, pVSManager_,
-            pGeometryManager_, "cubemap");
+        CubemapGenerator cubeMapGen(pDevice_, pDeviceContext_, pSamplerManager_, pTextureManager_, pILManager_, pPSManager_, pVSManager_,
+            pGeometryManager_);
+        result = cubeMapGen.init();
+        if (SUCCEEDED(result)) {
+            result = cubeMapGen.generateCubeMap("cubemap");
+        }
+        if (SUCCEEDED(result)) {
+            result = cubeMapGen.generateIrradianceMap("cubemap", "irradiance");
+        }
     }
 
     return result;
@@ -525,6 +534,9 @@ HRESULT Renderer::InitObjects() {
     }
     if (SUCCEEDED(result)) {
         result = pPSManager_.get("default", sphere.PS);
+    }
+    if (SUCCEEDED(result)) {
+        result = pTextureManager_.get("irradiance", sphere.irradianceMap);
     }
     return result;
 }
@@ -574,7 +586,6 @@ bool Renderer::UpdateScene() {
         ViewMatrixBuffer& sceneBuffer = *reinterpret_cast<ViewMatrixBuffer*>(subresource.pData);
         sceneBuffer.viewProjectionMatrix = XMMatrixMultiply(mView, mProjection);
         sceneBuffer.cameraPos = XMFLOAT4(cameraPos.x, cameraPos.y, cameraPos.z, 1.0f);
-        sceneBuffer.ambientColor = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
         sceneBuffer.lightParams = XMINT4(int(lights_.size()), 0, 0, 0);
         for (int i = 0; i < lights_.size(); i++) {
             sceneBuffer.lights[i].pos = lights_[i].pos;
@@ -758,6 +769,7 @@ bool Renderer::Render() {
     pAnnotation_->BeginEvent(L"Draw_sphere");
 #endif
 
+    pDeviceContext_->PSSetSamplers(0, 1, samplers);
     RenderObjects();
 
     if (default_) {
@@ -813,6 +825,9 @@ void Renderer::RenderSkybox() {
 }
 
 void Renderer::RenderObjects() {
+    ID3D11ShaderResourceView* resources[] = { sphere.irradianceMap->getSRV() };
+    pDeviceContext_->PSSetShaderResources(0, 1, resources);
+
     pDeviceContext_->IASetIndexBuffer(sphere.geometry->getIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
     ID3D11Buffer* vertexBuffers[] = { sphere.geometry->getVertexBuffer() };
     UINT strides[] = { sphere.vertexSize };

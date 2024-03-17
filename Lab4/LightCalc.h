@@ -1,9 +1,18 @@
 #include "SceneMatrixBuffer.h"
 
+TextureCube irradianceTexture : register (t0);
+SamplerState irradianceSampler : register (s0);
+
 float3 fresnelFunction(in float3 objColor, in float3 h, in float3 v, in float metalness)
 {
     float3 f = float3(0.04f, 0.04f, 0.04f) * (1 - metalness) + objColor * metalness;
     return f + (float3(1.0f, 1.0f, 1.0f) - f) * pow(1.0f - max(dot(h, v), 0.0f), 5);
+}
+
+float3 fresnelRoughnessFunction(in float3 objColor, in float3 n, in float3 v, in float metalness, in float roughness)
+{
+    float3 f = float3(0.04f, 0.04f, 0.04f) * (1 - metalness) + objColor * metalness;
+    return f + (max(float3(1.0f, 1.0f, 1.0f) - float3(roughness, roughness, roughness), f) - f) * pow(1.0f - max(dot(n, v), 0.0f), 5);
 }
 
 float distributionGGX(in float3 n, in float3 h, in float roughness)
@@ -31,14 +40,18 @@ float geometrySmith(in float3 n, in float3 v, in float3 l, in float roughness)
 
 float3 CalculateColor(in float3 objColor, in float3 objNormal, in float3 pos, in float roughness, in float metalness)
 {
-#if defined(DEFAULT)
-    float3 finalColor = ambientColor.xyz * objColor;
-#else
+    float3 viewDir = normalize(cameraPos.xyz - pos);
+    static float pi = 3.14159265359f;
     float3 finalColor = float3(0.0f, 0.0f, 0.0f);
+#if defined(DEFAULT)
+    float3 FR = fresnelRoughnessFunction(objColor, objNormal, viewDir, metalness, roughness);
+    float3 kD = float3(1.0f, 1.0f, 1.0f) - FR;
+    kD *= 1.0 - metalness;
+    float3 irradiance = irradianceTexture.Sample(irradianceSampler, objNormal).xyz;
+    float3 ambient = irradiance * objColor * kD;
+    finalColor += ambient;
 #endif
 
-    float3 viewDir = normalize(cameraPos.xyz - pos);
-    float pi = 3.14159265359f;
     [unroll] for (int i = 0; i < lightParams.x; i++)
     {
         float3 lightDir = lights[i].lightPos.xyz - pos;
@@ -59,7 +72,7 @@ float3 CalculateColor(in float3 objColor, in float3 objNormal, in float3 pos, in
 
 #if defined(DEFAULT) || defined(FRESNEL)
         float3 kd = float3(1.0f, 1.0f, 1.0f) - F;
-        kd = kd * (1.0f - metalness);
+        kd *= 1.0f - metalness;
 #endif
 
 #if defined(DEFAULT)
