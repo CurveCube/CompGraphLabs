@@ -8,7 +8,7 @@
 class CubemapGenerator
 {
     static const UINT sideSize = 512;
-    static const UINT irradianceSideSize = 64;
+    static const UINT irradianceSideSize = 32;
 
     struct SimpleVertex {
         XMFLOAT3 pos;
