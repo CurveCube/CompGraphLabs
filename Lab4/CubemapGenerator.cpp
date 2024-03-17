@@ -21,32 +21,32 @@ HRESULT CubemapGenerator::generate(
         DirectX::XMMatrixLookToLH(
             DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
             DirectX::XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f),
-            DirectX::XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f)
+            DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)
         ),
         DirectX::XMMatrixLookToLH(
             DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
             DirectX::XMVectorSet(-1.0f, 0.0f, 0.0f, 0.0f),
-            DirectX::XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f)
+            DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)
         ),
         DirectX::XMMatrixLookToLH(
             DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
             DirectX::XMVectorSet(0.0f,  1.0f,  0.0f, 0.0f),
-            DirectX::XMVectorSet(0.0f,  0.0f,  1.0f, 0.0f)
-        ),
-        DirectX::XMMatrixLookToLH(
-            DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
-            DirectX::XMVectorSet(0.0f,  -1.0f,  0.0f, 0.0f),
             DirectX::XMVectorSet(0.0f,  0.0f,  -1.0f, 0.0f)
         ),
         DirectX::XMMatrixLookToLH(
             DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
+            DirectX::XMVectorSet(0.0f,  -1.0f,  0.0f, 0.0f),
+            DirectX::XMVectorSet(0.0f,  0.0f,  1.0f, 0.0f)
+        ),
+        DirectX::XMMatrixLookToLH(
+            DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
             DirectX::XMVectorSet(0.0f,  0.0f,  1.0f, 0.0f),
-            DirectX::XMVectorSet(0.0f, -1.0f,  0.0f, 0.0f)
+            DirectX::XMVectorSet(0.0f, 1.0f,  0.0f, 0.0f)
         ),
         DirectX::XMMatrixLookToLH(
             DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
             DirectX::XMVectorSet(0.0f,  0.0f,  -1.0f, 0.0f),
-            DirectX::XMVectorSet(0.0f, -1.0f,  0.0f, 0.0f)
+            DirectX::XMVectorSet(0.0f, 1.0f,  0.0f, 0.0f)
         ),
     };
 
