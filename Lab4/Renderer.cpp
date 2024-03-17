@@ -107,12 +107,6 @@ bool Renderer::Init(HINSTANCE hInstance, HWND hWnd) {
         Cleanup();
     }
 
-    if (SUCCEEDED(result)) {
-        result = cubemapGenerator_.generate(pDevice_, pDeviceContext_, pSamplerManager_, pTextureManager_, pILManager_, pPSManager_, pVSManager_, pGeometryManager_);
-        cubemapGenerator_.getCubemapTexture(skybox.texture);
-        //cubemapGenerator_.Cleanup();
-    }
-
     return SUCCEEDED(result);
 }
 
@@ -481,18 +475,20 @@ HRESULT Renderer::LoadGeometry() {
 
 HRESULT Renderer::LoadTextures() {
     pTextureManager_.setDevice(pDevice_);
+    pTextureManager_.setDeviceContext(pDeviceContext_);
     HRESULT result;
-//#ifndef _DEBUG
-//    result = pTextureManager_.loadCubeMapTexture(L"textures/cube.dds", "cubemap");
-//#else  // Маркер ресурса для отладочной сборки
-//    result = pTextureManager_.loadCubeMapTexture(L"textures/cube.dds", "cubemap", "CubeMapTextImages");
-//#endif
-
 #ifndef _DEBUG
-    result = pTextureManager_.loadHDRTexture("textures/kloofendal_48d_partly_cloudy_puresky_1k.hdr", "hdr");
+    result = pTextureManager_.loadHDRTexture("textures/hdr_text.hdr", "hdr");
 #else  // Маркер ресурса для отладочной сборки
     result = pTextureManager_.loadHDRTexture("textures/hdr_text.hdr", "hdr", "HDRTextImages");
 #endif
+
+    if (SUCCEEDED(result)) {
+        CubemapGenerator cubeMapGen(pDevice_, pDeviceContext_);
+        result = cubeMapGen.generateCubeMap(pSamplerManager_, pTextureManager_, pILManager_, pPSManager_, pVSManager_,
+            pGeometryManager_, "cubemap");
+    }
+
     return result;
 }
 
@@ -510,8 +506,7 @@ HRESULT Renderer::InitSkybox() {
         result = pPSManager_.get("skybox", skybox.PS);
     }
     if (SUCCEEDED(result)) {
-        //result = pTextureManager_.get("cubemap", skybox.texture);
-        
+        result = pTextureManager_.get("cubemap", skybox.texture);
     }
     return result;
 }
@@ -905,7 +900,6 @@ void Renderer::Cleanup() {
     pPSManager_.Cleanup();
     pTextureManager_.Cleanup();
     pSamplerManager_.Cleanup();
-    cubemapGenerator_.Cleanup();
 
     SAFE_RELEASE(pRenderTargetView_);
     SAFE_RELEASE(pSwapChain_);

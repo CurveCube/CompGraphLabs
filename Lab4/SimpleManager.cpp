@@ -172,6 +172,16 @@ HRESULT SimpleTextureManager::loadTexture(LPCWSTR filePath, const std::string& k
 }
 
 
+HRESULT SimpleTextureManager::loadTexture(ID3D11Resource* texture, ID3D11ShaderResourceView* SRV, const std::string& key) {
+    if (check(key))
+        return E_FAIL; // Не допускаем перезаписи значения для ключа
+    
+    objects_.emplace(key, std::make_shared<SimpleTexture>(texture, SRV));
+
+    return S_OK;
+}
+
+
 HRESULT SimpleTextureManager::loadCubeMapTexture(LPCWSTR filePath, const std::string& key, const std::string& annotationText) {
     if (check(key))
         return E_FAIL; // Не допускаем перезаписи значения для ключа
@@ -190,14 +200,13 @@ HRESULT SimpleTextureManager::loadCubeMapTexture(LPCWSTR filePath, const std::st
     return result;
 }
 
+
 HRESULT SimpleTextureManager::loadHDRTexture(const char* filePath, const std::string& key, const std::string& annotationText)
 {
     if (check(key))
         return E_FAIL; // Не допускаем перезаписи значения для ключа
 
-    ID3D11Resource* textureResource;
     ID3D11ShaderResourceView* SRV;
-    //stbi_set_flip_vertically_on_load(true);
     bool b = stbi_is_hdr(filePath);
     int width, height, nrComponents;
     float* data = stbi_loadf(filePath, &width, &height, &nrComponents, 4);
@@ -237,13 +246,11 @@ HRESULT SimpleTextureManager::loadHDRTexture(const char* filePath, const std::st
         result = device_.get()->CreateShaderResourceView(texture, &descSRV, &SRV);
     }
 
-    textureResource = texture;
-
     if (SUCCEEDED(result) && annotationText != "") {
         result = texture->SetPrivateData(WKPDID_D3DDebugObjectName, annotationText.size(), annotationText.c_str());
-    }result = texture->SetPrivateData(WKPDID_D3DDebugObjectName, annotationText.size(), annotationText.c_str());
+    }
     if (SUCCEEDED(result)) {
-        objects_.emplace(key, std::make_shared<SimpleTexture>(textureResource, SRV));
+        objects_.emplace(key, std::make_shared<SimpleTexture>(texture, SRV));
     }
 
     stbi_image_free(data);

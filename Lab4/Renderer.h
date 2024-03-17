@@ -115,6 +115,5 @@ private:
     UINT height_;
 
     ToneMapping toneMapping_;
-    CubemapGenerator cubemapGenerator_;
     bool default_ = true;
 };

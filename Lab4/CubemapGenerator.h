@@ -7,49 +7,52 @@
 
 class CubemapGenerator
 {
-	static const UINT sideSize = 512;
+    static const UINT sideSize = 512;
+    static const UINT irradianceSideSize = 32;
 
-	struct SimpleVertex {
-		XMFLOAT3 pos;
-	};
+    struct SimpleVertex {
+        XMFLOAT3 pos;
+    };
 
-	struct CameraBuffer {
-		XMMATRIX viewProjMatrix;
-	};
+    struct CameraBuffer {
+        XMMATRIX viewProjMatrix;
+    };
 
 public:
-	HRESULT generate(
-		std::shared_ptr<ID3D11Device>, std::shared_ptr <ID3D11DeviceContext>,
-		SimpleSamplerManager&, SimpleTextureManager&,
-		SimpleILManager&, SimplePSManager&, 
-		SimpleVSManager&, SimpleGeometryManager&);
+    CubemapGenerator(std::shared_ptr<ID3D11Device>& device, std::shared_ptr <ID3D11DeviceContext>& deviceContext);
 
-	HRESULT createBuffer(std::shared_ptr<ID3D11Device>);
+    HRESULT generateCubeMap(SimpleSamplerManager&, SimpleTextureManager&,
+        SimpleILManager&, SimplePSManager&, 
+        SimpleVSManager&, SimpleGeometryManager&,
+        const std::string&);
 
-	void Cleanup();
+    void Cleanup();
 
-	void getCubemapTexture(std::shared_ptr<SimpleTexture>&);
-
-private:
-	HRESULT createHdrMappedTexture(std::shared_ptr<ID3D11Device>, std::shared_ptr <ID3D11DeviceContext>);
-	HRESULT createCubemapTexture(std::shared_ptr<ID3D11Device>);
-	void renderToCubeMap(std::shared_ptr <ID3D11DeviceContext>, SimplePSManager&, SimpleVSManager&, SimpleSamplerManager&, int);
-	HRESULT createGgeometry(SimpleGeometryManager&);
-	HRESULT renderSubHdr(std::shared_ptr <ID3D11DeviceContext>, 
-		SimplePSManager&, SimpleVSManager&, 
-		SimpleSamplerManager&, SimpleTextureManager&, 
-		SimpleILManager&, SimpleGeometryManager&, int);
+    ~CubemapGenerator() {
+        Cleanup();
+    }
 
 private:
-	ID3D11Texture2D* subHdrMappedTexture = NULL;
-	ID3D11RenderTargetView* subHdrMappedRTV = NULL;
-	ID3D11ShaderResourceView* subHdrMappedSRV = NULL;
-	ID3D11Texture2D* cubemapTexture = NULL;
-	ID3D11RenderTargetView* cubemapRTV[6];
-	ID3D11ShaderResourceView* cubemapSRV = NULL;
-	ID3D11Buffer* pCameraBuffer = NULL;
-	DirectX::XMMATRIX projectionMatrix = XMMatrixPerspectiveFovLH(XM_PI / 2, 1.0f, 0.1f, 10.0f);
-	std::vector<DirectX::XMMATRIX> viewMatrices;
-	std::vector<std::string> sides;
+    HRESULT createHdrMappedTexture();
+    HRESULT createCubemapTexture(SimpleTextureManager&, const std::string&);
+    HRESULT createBuffer();
+    HRESULT renderToCubeMap(SimplePSManager&, SimpleVSManager&, SimpleSamplerManager&, int);
+    HRESULT createGeometry(SimpleGeometryManager&);
+    HRESULT renderSubHdr(SimplePSManager&, SimpleVSManager&, 
+        SimpleSamplerManager&, SimpleTextureManager&, 
+        SimpleILManager&, SimpleGeometryManager&, int);
+
+private:
+    std::shared_ptr<ID3D11Device> device_;
+    std::shared_ptr <ID3D11DeviceContext> deviceContext_;
+
+    ID3D11Texture2D* subHdrMappedTexture = nullptr;
+    ID3D11RenderTargetView* subHdrMappedRTV = nullptr;
+    ID3D11ShaderResourceView* subHdrMappedSRV = nullptr;
+    ID3D11RenderTargetView* cubemapRTV[6] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+    ID3D11Buffer* pCameraBuffer = nullptr;
+
+    DirectX::XMMATRIX projectionMatrix = XMMatrixPerspectiveFovLH(XM_PI / 2, 1.0f, 0.1f, 10.0f);
+    std::vector<DirectX::XMMATRIX> viewMatrices;
+    std::vector<std::string> sides;
 };
-

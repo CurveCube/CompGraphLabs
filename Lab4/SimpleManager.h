@@ -186,6 +186,7 @@ public:
         SimpleManagerBase(devicePtr), deviceContext_(deviceContextPtr) {};
 
     HRESULT loadTexture(LPCWSTR filePath, const std::string& key, const std::string& annotationText = "");
+    HRESULT loadTexture(ID3D11Resource* texture, ID3D11ShaderResourceView* SRV, const std::string& key);
     HRESULT loadCubeMapTexture(LPCWSTR filePath, const std::string& key, const std::string& annotationText = "");
     HRESULT loadHDRTexture(const char* filePath, const std::string& key, const std::string& annotationText = "");
 
