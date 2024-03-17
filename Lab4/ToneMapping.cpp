@@ -264,7 +264,7 @@ void ToneMapping::RenderTonemap() {
     }
 
     AdaptBuffer adaptBuffer;
-    adaptBuffer.adapt = XMFLOAT4(adapt, 0.0f, 0.0f, 0.0f);
+    adaptBuffer.adapt = XMFLOAT4(adapt, factor, 0.0f, 0.0f);
 
     m_deviceContext->UpdateSubresource(m_adaptBuffer, 0, nullptr, &adaptBuffer, 0, 0);
 

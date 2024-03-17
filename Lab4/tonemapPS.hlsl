@@ -30,11 +30,12 @@ float3 Uncharted2Tonemap(float3 x) {
     return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F;
 }
 
-float3 TonemapFilmic(float3 color, float adaptedAvg) {
+float3 TonemapFilmic(float3 color, float adaptedAvg, float Efactor) {
     float avg = exp(adaptedAvg) - 1.0f;
     float keyValue = 1.03f - 2.0f / (2.0f + log(avg + 1.0f));
 
     float E = keyValue / clamp(avg, minTexture.Sample(colorSampler, float2(0.5f, 0.5f)).x, maxTexture.Sample(colorSampler, float2(0.5f, 0.5f)).x);
+    E *= Efactor;
     float3 curr = Uncharted2Tonemap(E * color);
     float3 whiteScale = 1.0f / Uncharted2Tonemap(W);
     return curr * whiteScale;
@@ -43,6 +44,6 @@ float3 TonemapFilmic(float3 color, float adaptedAvg) {
 PS_OUTPUT main(PS_INPUT input) : SV_TARGET{
     PS_OUTPUT output;
 
-    output.color = float4(TonemapFilmic(colorTexture.Sample(colorSampler, input.uv).xyz, adapt.x), 1.0f);
+    output.color = float4(TonemapFilmic(colorTexture.Sample(colorSampler, input.uv).xyz, adapt.x, adapt.y), 1.0f);
     return output;
 }

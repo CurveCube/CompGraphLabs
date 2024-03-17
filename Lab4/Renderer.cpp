@@ -643,6 +643,14 @@ void Renderer::UpdateImgui() {
             }
         }
 
+        if (default_) {
+            static float factor;
+            factor = toneMapping_.GetFactor();
+            str = "Exposure factor";
+            ImGui::DragFloat(str.c_str(), &factor, 0.01f, 0.0f, 10.0f);
+            toneMapping_.SetFactor(factor);
+        }
+
         str = "Object";
         ImGui::Text(str.c_str());
 

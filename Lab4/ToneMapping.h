@@ -36,6 +36,12 @@ public:
     void ResetEyeAdaptation();
     HRESULT Resize(int textureWidth, int textureHeight);
     void Cleanup();
+    void SetFactor(float f) {
+        factor = f;
+    };
+    float GetFactor() {
+        return factor;
+    }
 
 private:
     HRESULT CreateTextures(int textureWidth, int textureHeight);
@@ -68,5 +74,6 @@ private:
     std::chrono::time_point<std::chrono::steady_clock> m_lastFrame;
 
     float adapt = -1.0f;
+    float factor = 1.0f;
     float s = 0.5f;
 };
