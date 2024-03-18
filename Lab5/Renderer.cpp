@@ -491,10 +491,10 @@ HRESULT Renderer::LoadTextures() {
             pGeometryManager_);
         result = cubeMapGen.init();
         if (SUCCEEDED(result)) {
-            result = cubeMapGen.generateCubeMap("cubemap");
+            result = cubeMapGen.generateEnvironmentMap("evironment");
         }
         if (SUCCEEDED(result)) {
-            result = cubeMapGen.generateIrradianceMap("cubemap", "irradiance");
+            result = cubeMapGen.generateIrradianceMap("evironment", "irradiance");
         }
     }
 
@@ -515,7 +515,7 @@ HRESULT Renderer::InitSkybox() {
         result = pPSManager_.get("skybox", skybox.PS);
     }
     if (SUCCEEDED(result)) {
-        result = pTextureManager_.get("cubemap", skybox.texture);
+        result = pTextureManager_.get("evironment", skybox.texture);
     }
     return result;
 }

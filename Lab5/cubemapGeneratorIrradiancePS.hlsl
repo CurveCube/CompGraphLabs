@@ -21,7 +21,7 @@ float4 main(PS_INPUT input) : SV_TARGET{
             float theta = j * (PI / 2 / N2);
             float3 tangentSample = float3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
             float3 sampleVec = tangentSample.x * tangent + tangentSample.y * binormal + tangentSample.z * normal;
-            irradiance += colorTexture.Sample(colorSampler, sampleVec) * cos(theta) * sin(theta);
+            irradiance += colorTexture.SampleLevel(colorSampler, sampleVec, 0.0f) * cos(theta) * sin(theta);
         }
     }
     irradiance = PI * irradiance / (N1 * N2);

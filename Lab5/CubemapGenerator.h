@@ -26,7 +26,7 @@ public:
 
     HRESULT init();
 
-    HRESULT generateCubeMap(const std::string&);
+    HRESULT generateEnvironmentMap(const std::string&);
     HRESULT generateIrradianceMap(const std::string&, const std::string&);
 
     void Cleanup();
@@ -38,7 +38,7 @@ public:
 
 private:
     HRESULT createTexture(UINT);
-    HRESULT createCubemapTexture(UINT, const std::string&);
+    HRESULT createCubemapTexture(UINT, const std::string&, bool withMipMap);
     HRESULT createBuffer();
     HRESULT renderToCubeMap(UINT, int);
     HRESULT createGeometry();

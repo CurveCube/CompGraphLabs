@@ -59,13 +59,13 @@ HRESULT CubemapGenerator::init()
     return result;
 }
 
-HRESULT CubemapGenerator::generateCubeMap(const std::string& key)
+HRESULT CubemapGenerator::generateEnvironmentMap(const std::string& key)
 {
     Cleanup();
 
     HRESULT result = createTexture(sideSize);
     if (SUCCEEDED(result)) {
-        result = createCubemapTexture(sideSize, key);
+        result = createCubemapTexture(sideSize, key, true);
     }
 
     for (int i = 0; i < 6 && SUCCEEDED(result); i++)
@@ -75,6 +75,10 @@ HRESULT CubemapGenerator::generateCubeMap(const std::string& key)
             result = renderToCubeMap(sideSize, i);
         }
     }
+
+    std::shared_ptr<SimpleTexture> envMapTexture;
+    textureManager_.get(key, envMapTexture);
+    deviceContext_->GenerateMips(envMapTexture->getSRV());
 
     return result;
 }
@@ -88,7 +92,7 @@ HRESULT CubemapGenerator::generateIrradianceMap(
 
     HRESULT result = createTexture(irradianceSideSize);
     if (SUCCEEDED(result)) {
-        result = createCubemapTexture(irradianceSideSize, key);
+        result = createCubemapTexture(irradianceSideSize, key, false);
     }
 
     for (int i = 0; i < 6 && SUCCEEDED(result); i++)
@@ -176,7 +180,7 @@ HRESULT CubemapGenerator::createBuffer()
     return device_->CreateBuffer(&desc, &data, &pCameraBuffer);
 }
 
-HRESULT CubemapGenerator::createCubemapTexture(UINT size, const std::string& key)
+HRESULT CubemapGenerator::createCubemapTexture(UINT size, const std::string& key, bool withMipMap)
 {
     ID3D11Texture2D* cubemapTexture = nullptr;
     ID3D11ShaderResourceView* cubemapSRV = nullptr;
@@ -220,7 +224,7 @@ HRESULT CubemapGenerator::createCubemapTexture(UINT size, const std::string& key
         shaderResourceViewDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
         shaderResourceViewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
         shaderResourceViewDesc.Texture2D.MostDetailedMip = 0;
-        shaderResourceViewDesc.Texture2D.MipLevels = 1;
+        shaderResourceViewDesc.Texture2D.MipLevels = withMipMap ? -1 : 1;
 
         result = device_->CreateShaderResourceView(cubemapTexture, &shaderResourceViewDesc, &cubemapSRV);
     }
