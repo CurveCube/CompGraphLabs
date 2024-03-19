@@ -323,6 +323,15 @@ HRESULT Renderer::LoadShaders() {
     if (SUCCEEDED(result)) {
         result = pPSManager_.loadPS(L"copyToCubemapPS.hlsl", nullptr, "copyToCubemapPS");
     }
+    if (SUCCEEDED(result)) {
+        result = pPSManager_.loadPS(L"prefilteredColorPS.hlsl", nullptr, "prefilteredColorPS");
+    }
+    if (SUCCEEDED(result)) {
+        result = pVSManager_.loadVS(L"brdfVS.hlsl", nullptr, "brdf");
+    }
+    if (SUCCEEDED(result)) {
+        result = pPSManager_.loadPS(L"brdfPS.hlsl", nullptr, "brdf");
+    }
     return result;
 }
 
@@ -495,6 +504,12 @@ HRESULT Renderer::LoadTextures() {
         }
         if (SUCCEEDED(result)) {
             result = cubeMapGen.generateIrradianceMap("evironment", "irradiance");
+        }
+        if (SUCCEEDED(result)) {
+            result = cubeMapGen.generatePrefilteredMap("evironment", "prefiltered");
+        }
+        if (SUCCEEDED(result)) {
+            result = cubeMapGen.generateBRDF("brdf");
         }
     }
 
@@ -833,8 +848,19 @@ void Renderer::RenderSkybox() {
 }
 
 void Renderer::RenderObjects() {
-    ID3D11ShaderResourceView* resources[] = { sphere.irradianceMap->getSRV() };
-    pDeviceContext_->PSSetShaderResources(0, 1, resources);
+    std::shared_ptr<SimpleTexture> prefilteredText;
+    std::shared_ptr<SimpleTexture> brdfText;
+    pTextureManager_.get("prefiltered", prefilteredText);
+    pTextureManager_.get("brdf", brdfText);
+
+    std::shared_ptr<ID3D11SamplerState> avgSample;
+    pSamplerManager_.get("avg", avgSample);
+
+    ID3D11SamplerState* samplers[] = { avgSample.get() };
+    pDeviceContext_->PSSetSamplers(1, 1, samplers);
+
+    ID3D11ShaderResourceView* resources[] = { sphere.irradianceMap->getSRV(), prefilteredText->getSRV(), brdfText->getSRV() };
+    pDeviceContext_->PSSetShaderResources(0, 3, resources);
 
     pDeviceContext_->IASetIndexBuffer(sphere.geometry->getIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
     ID3D11Buffer* vertexBuffers[] = { sphere.geometry->getVertexBuffer() };

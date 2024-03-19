@@ -197,5 +197,14 @@
     <None Include="VS.hlsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="prefilteredColorPS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="brdfVS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="brdfPS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
