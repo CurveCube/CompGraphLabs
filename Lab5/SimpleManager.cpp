@@ -82,15 +82,15 @@ HRESULT SimplePSManager::loadPS(LPCWSTR filePath, const D3D_SHADER_MACRO* macros
 }
 
 
-HRESULT SimpleSamplerManager::loadSampler(D3D11_FILTER filter, const std::string& key) {
+HRESULT SimpleSamplerManager::loadSampler(D3D11_FILTER filter, const std::string& key, D3D11_TEXTURE_ADDRESS_MODE mode) {
     if (check(key))
         return E_FAIL; // Не допускаем перезаписи значения для ключа
 
     D3D11_SAMPLER_DESC desc = {};
     desc.Filter = filter;
-    desc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
-    desc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
-    desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+    desc.AddressU = mode;
+    desc.AddressV = mode;
+    desc.AddressW = mode;
     desc.MinLOD = -FLT_MAX;
     desc.MaxLOD = FLT_MAX;
     desc.MipLODBias = 0.0f;

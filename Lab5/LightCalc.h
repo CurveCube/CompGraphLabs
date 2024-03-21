@@ -51,13 +51,13 @@ float3 CalculateColor(in float3 objColor, in float3 objNormal, in float3 pos, in
     static const float MAX_REFLECTION_LOD = 4.0f;
     float3 prefilteredColor = prefilteredTexture.SampleLevel(prefilteredSampler, R, roughness * MAX_REFLECTION_LOD);
     float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), objColor.xyz, metalness);
-    float2 envBRDF = brdfTexture.Sample(irradianceSampler, float2(max(dot(objNormal, viewDir), 0.0f), roughness));
+    float2 envBRDF = brdfTexture.Sample(prefilteredSampler, float2(max(dot(objNormal, viewDir), 0.0f), roughness));
     float3 specular = prefilteredColor * (F0 * envBRDF.x + envBRDF.y);
 
     float3 FR = fresnelRoughnessFunction(objColor, objNormal, viewDir, metalness, roughness);
     float3 kD = float3(1.0f, 1.0f, 1.0f) - FR;
     kD *= 1.0 - metalness;
-    float3 irradiance = irradianceTexture.Sample(irradianceSampler, objNormal).xyz;
+    float3 irradiance = irradianceTexture.Sample(prefilteredSampler, objNormal).xyz;
     float3 ambient = irradiance * objColor * kD + specular;
     finalColor += ambient;
 #endif

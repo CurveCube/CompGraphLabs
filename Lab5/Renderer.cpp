@@ -199,15 +199,15 @@ HRESULT Renderer::CreateSwapChain(HWND hWnd) {
 HRESULT Renderer::CreateSamplers() {
     pSamplerManager_.setDevice(pDevice_);
 
-    HRESULT result = pSamplerManager_.loadSampler(D3D11_FILTER_ANISOTROPIC, "default");
+    HRESULT result = pSamplerManager_.loadSampler(D3D11_FILTER_ANISOTROPIC, "default", D3D11_TEXTURE_ADDRESS_WRAP);
     if (SUCCEEDED(result)) {
-        result = pSamplerManager_.loadSampler(D3D11_FILTER_MINIMUM_ANISOTROPIC, "min");
+        result = pSamplerManager_.loadSampler(D3D11_FILTER_MINIMUM_ANISOTROPIC, "min", D3D11_TEXTURE_ADDRESS_WRAP);
     }
     if (SUCCEEDED(result)) {
-        result = pSamplerManager_.loadSampler(D3D11_FILTER_MAXIMUM_ANISOTROPIC, "max");
+        result = pSamplerManager_.loadSampler(D3D11_FILTER_MAXIMUM_ANISOTROPIC, "max", D3D11_TEXTURE_ADDRESS_WRAP);
     }
     if (SUCCEEDED(result)) {
-        result = pSamplerManager_.loadSampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, "avg");
+        result = pSamplerManager_.loadSampler(D3D11_FILTER_MIN_MAG_MIP_LINEAR, "avg", D3D11_TEXTURE_ADDRESS_CLAMP);
     }
     return result;
 }

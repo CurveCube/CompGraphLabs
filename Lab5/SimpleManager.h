@@ -96,7 +96,7 @@ class SimpleSamplerManager : public SimpleManagerBase<ID3D11SamplerState> {
 public:
     SimpleSamplerManager(const std::shared_ptr<ID3D11Device>& devicePtr) : SimpleManagerBase(devicePtr) {};
 
-    HRESULT loadSampler(D3D11_FILTER filter, const std::string& key);
+    HRESULT loadSampler(D3D11_FILTER filter, const std::string& key, D3D11_TEXTURE_ADDRESS_MODE mode);
 
     ~SimpleSamplerManager() = default;
 };
