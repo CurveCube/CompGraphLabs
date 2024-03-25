@@ -101,7 +101,7 @@
     <ClInclude Include="SimpleObject.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="Skybox.h">
+    <ClInclude Include="SkyBox.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="ToneMapping.h">
@@ -151,6 +151,24 @@
     </ClInclude>
     <ClInclude Include="Lab6.h">
       <Filter>Файлы заголовков\Общие заголовки</Filter>
+    </ClInclude>
+    <ClInclude Include="ShaderManagers.hpp">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="Node.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="Mesh.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="Material.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="Buffers.h">
+      <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

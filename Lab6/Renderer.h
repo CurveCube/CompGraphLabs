@@ -3,10 +3,11 @@
 #include "framework.h"
 #include "Camera.h"
 #include "Input.h"
-#include "Skybox.h"
+#include "SkyBox.h"
 #include "SimpleObject.h"
 #include "ToneMapping.h"
 #include "CubemapGenerator.h"
+#include "ShaderManagers.hpp"
 #include <vector>
 #include <string>
 

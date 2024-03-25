@@ -272,24 +272,31 @@ HRESULT Renderer::LoadShaders() {
     pVSManager_.setDevice(pDevice_);
     pILManager_.setDevice(pDevice_);
     pPSManager_.setDevice(pDevice_);
+    PSManager psManager(pDevice_, L"shaders");
+    VSManager vsManager(pDevice_, L"shaders");
 
     HRESULT result = pVSManager_.loadVS(L"shaders/VS.hlsl", nullptr, "sphere",
         &pILManager_, VertexDesc, sizeof(VertexDesc) / sizeof(VertexDesc[0]));
+    result = vsManager.LoadShader(L"VS.hlsl", {});
     if (SUCCEEDED(result)) {
         D3D_SHADER_MACRO shaderMacros[] = { {"DEFAULT"}, {NULL, NULL} };
         result = pPSManager_.loadPS(L"shaders/PS.hlsl", shaderMacros, "default");
+        result = psManager.LoadShader(L"PS.hlsl", { "DEFAULT" });
     }
     if (SUCCEEDED(result)) {
         D3D_SHADER_MACRO shaderMacros[] = { {"FRESNEL"}, {NULL, NULL} };
         result = pPSManager_.loadPS(L"shaders/PS.hlsl", shaderMacros, "fresnel");
+        result = psManager.LoadShader(L"PS.hlsl", { "FRESNEL" });
     }
     if (SUCCEEDED(result)) {
         D3D_SHADER_MACRO shaderMacros[] = { {"ND"}, {NULL, NULL} };
         result = pPSManager_.loadPS(L"shaders/PS.hlsl", shaderMacros, "ndf");
+        result = psManager.LoadShader(L"PS.hlsl", { "ND" });
     }
     if (SUCCEEDED(result)) {
         D3D_SHADER_MACRO shaderMacros[] = { {"GEOMETRY"}, {NULL, NULL} };
         result = pPSManager_.loadPS(L"shaders/PS.hlsl", shaderMacros, "geometry");
+        result = psManager.LoadShader(L"PS.hlsl", { "GEOMETRY" });
     }
     if (SUCCEEDED(result)) {
         result = pVSManager_.loadVS(L"shaders/CubeMapVS.hlsl", nullptr, "skybox",

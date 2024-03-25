@@ -37,6 +37,7 @@
     <ClCompile Include="ToneMapping.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Buffers.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="CubemapGenerator.h" />
     <ClInclude Include="D3DInclude.h" />
@@ -51,11 +52,16 @@
     <ClInclude Include="imgui\imstb_truetype.h" />
     <ClInclude Include="Input.h" />
     <ClInclude Include="Lab6.h" />
+    <ClInclude Include="Material.h" />
+    <ClInclude Include="Mesh.h" />
+    <ClInclude Include="Node.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="Scene.h" />
+    <ClInclude Include="ShaderManagers.hpp" />
     <ClInclude Include="SimpleManager.h" />
     <ClInclude Include="SimpleObject.h" />
-    <ClInclude Include="Skybox.h" />
+    <ClInclude Include="SkyBox.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="textureLoaders\DDSTextureLoader11.h" />
     <ClInclude Include="textureLoaders\stb_image.h" />

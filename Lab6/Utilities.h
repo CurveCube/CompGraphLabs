@@ -1,9 +1,6 @@
 #pragma once
 
 
-#define SAFE_RELEASE(A) if ((A) != nullptr) { (A)->Release(); (A) = nullptr; }
-
-
 namespace utilities {
     // Функция удаления объекта DX11 для умных указателей.
     template<typename T>
