@@ -352,14 +352,16 @@ HRESULT Renderer::LoadGeometry() {
     float phi = 0.0f;
     float theta = 0.0f;
 
-    std::vector<SimpleVertex> skyboxVertices(numVertices);
+    //========================================================================================================================================================================
+    //std::vector<SimpleVertex> skyboxVertices(numVertices);
+
     std::vector<Vertex> sphereVertices(numVertices);
 
     XMVECTOR currVertPos = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
 
-    skyboxVertices[0].pos.x = 0.0f;
-    skyboxVertices[0].pos.y = 0.0f;
-    skyboxVertices[0].pos.z = 1.0f;
+    //skyboxVertices[0].pos.x = 0.0f;
+    //skyboxVertices[0].pos.y = 0.0f;
+    //skyboxVertices[0].pos.z = 1.0f;
 
     sphereVertices[0].pos.x = 0.0f;
     sphereVertices[0].pos.y = 0.0f;
@@ -376,9 +378,9 @@ HRESULT Renderer::LoadGeometry() {
             XMMATRIX Rotationy = XMMatrixRotationZ(phi);
             currVertPos = XMVector3TransformNormal(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), (Rotationx * Rotationy));
             currVertPos = XMVector3Normalize(currVertPos);
-            skyboxVertices[i * (__int64)LongLines + j + 1].pos.x = XMVectorGetX(currVertPos);
-            skyboxVertices[i * (__int64)LongLines + j + 1].pos.y = XMVectorGetY(currVertPos);
-            skyboxVertices[i * (__int64)LongLines + j + 1].pos.z = XMVectorGetZ(currVertPos);
+            //skyboxVertices[i * (__int64)LongLines + j + 1].pos.x = XMVectorGetX(currVertPos);
+            //skyboxVertices[i * (__int64)LongLines + j + 1].pos.y = XMVectorGetY(currVertPos);
+            //skyboxVertices[i * (__int64)LongLines + j + 1].pos.z = XMVectorGetZ(currVertPos);
 
             sphereVertices[i * (__int64)LongLines + j + 1].pos.x = XMVectorGetX(currVertPos);
             sphereVertices[i * (__int64)LongLines + j + 1].pos.y = XMVectorGetY(currVertPos);
@@ -389,9 +391,9 @@ HRESULT Renderer::LoadGeometry() {
         }
     }
 
-    skyboxVertices[(__int64)numVertices - 1].pos.x = 0.0f;
-    skyboxVertices[(__int64)numVertices - 1].pos.y = 0.0f;
-    skyboxVertices[(__int64)numVertices - 1].pos.z = -1.0f;
+    //skyboxVertices[(__int64)numVertices - 1].pos.x = 0.0f;
+    //skyboxVertices[(__int64)numVertices - 1].pos.y = 0.0f;
+    //skyboxVertices[(__int64)numVertices - 1].pos.z = -1.0f;
 
     sphereVertices[(__int64)numVertices - 1].pos.x = 0.0f;
     sphereVertices[(__int64)numVertices - 1].pos.y = 0.0f;
@@ -400,23 +402,23 @@ HRESULT Renderer::LoadGeometry() {
     sphereVertices[(__int64)numVertices - 1].norm.y = 0.0f;
     sphereVertices[(__int64)numVertices - 1].norm.z = -1.0f;
 
-    std::vector<UINT> skyboxIndices(numIndices);
+    //std::vector<UINT> skyboxIndices(numIndices);
     std::vector<UINT> sphereIndices(numIndices);
 
     UINT k = 0;
     for (UINT i = 0; i < LongLines - 1; i++) {
-        skyboxIndices[k] = 0;
-        skyboxIndices[(__int64)k + 2] = i + 1;
-        skyboxIndices[(__int64)k + 1] = i + 2;
+        //skyboxIndices[k] = 0;
+        //skyboxIndices[(__int64)k + 2] = i + 1;
+        //skyboxIndices[(__int64)k + 1] = i + 2;
 
         sphereIndices[k] = i + 1;
         sphereIndices[(__int64)k + 2] = 0;
         sphereIndices[(__int64)k + 1] = i + 2;
         k += 3;
     }
-    skyboxIndices[k] = 0;
-    skyboxIndices[(__int64)k + 2] = LongLines;
-    skyboxIndices[(__int64)k + 1] = 1;
+    //skyboxIndices[k] = 0;
+    //skyboxIndices[(__int64)k + 2] = LongLines;
+    //skyboxIndices[(__int64)k + 1] = 1;
 
     sphereIndices[k] = LongLines;
     sphereIndices[(__int64)k + 2] = 0;
@@ -425,13 +427,13 @@ HRESULT Renderer::LoadGeometry() {
 
     for (UINT i = 0; i < LatLines - 3; i++) {
         for (UINT j = 0; j < LongLines - 1; j++) {
-            skyboxIndices[k] = i * LongLines + j + 1;
-            skyboxIndices[(__int64)k + 1] = i * LongLines + j + 2;
-            skyboxIndices[(__int64)k + 2] = (i + 1) * LongLines + j + 1;
+            //skyboxIndices[k] = i * LongLines + j + 1;
+            //skyboxIndices[(__int64)k + 1] = i * LongLines + j + 2;
+            //skyboxIndices[(__int64)k + 2] = (i + 1) * LongLines + j + 1;
 
-            skyboxIndices[(__int64)k + 3] = (i + 1) * LongLines + j + 1;
-            skyboxIndices[(__int64)k + 4] = i * LongLines + j + 2;
-            skyboxIndices[(__int64)k + 5] = (i + 1) * LongLines + j + 2;
+            //skyboxIndices[(__int64)k + 3] = (i + 1) * LongLines + j + 1;
+            //skyboxIndices[(__int64)k + 4] = i * LongLines + j + 2;
+            //skyboxIndices[(__int64)k + 5] = (i + 1) * LongLines + j + 2;
 
             sphereIndices[(__int64)k + 2] = i * LongLines + j + 1;
             sphereIndices[(__int64)k + 1] = i * LongLines + j + 2;
@@ -444,13 +446,13 @@ HRESULT Renderer::LoadGeometry() {
             k += 6;
         }
 
-        skyboxIndices[k] = (i * LongLines) + LongLines;
-        skyboxIndices[(__int64)k + 1] = (i * LongLines) + 1;
-        skyboxIndices[(__int64)k + 2] = ((i + 1) * LongLines) + LongLines;
+        //skyboxIndices[k] = (i * LongLines) + LongLines;
+        //skyboxIndices[(__int64)k + 1] = (i * LongLines) + 1;
+        //skyboxIndices[(__int64)k + 2] = ((i + 1) * LongLines) + LongLines;
 
-        skyboxIndices[(__int64)k + 3] = ((i + 1) * LongLines) + LongLines;
-        skyboxIndices[(__int64)k + 4] = (i * LongLines) + 1;
-        skyboxIndices[(__int64)k + 5] = ((i + 1) * LongLines) + 1;
+        //skyboxIndices[(__int64)k + 3] = ((i + 1) * LongLines) + LongLines;
+        //skyboxIndices[(__int64)k + 4] = (i * LongLines) + 1;
+        //skyboxIndices[(__int64)k + 5] = ((i + 1) * LongLines) + 1;
 
         sphereIndices[(__int64)k + 2] = (i * LongLines) + LongLines;
         sphereIndices[(__int64)k + 1] = (i * LongLines) + 1;
@@ -464,9 +466,9 @@ HRESULT Renderer::LoadGeometry() {
     }
 
     for (UINT i = 0; i < LongLines - 1; i++) {
-        skyboxIndices[k] = numVertices - 1;
-        skyboxIndices[(__int64)k + 2] = (numVertices - 1) - (i + 1);
-        skyboxIndices[(__int64)k + 1] = (numVertices - 1) - (i + 2);
+        //skyboxIndices[k] = numVertices - 1;
+        //skyboxIndices[(__int64)k + 2] = (numVertices - 1) - (i + 1);
+        //skyboxIndices[(__int64)k + 1] = (numVertices - 1) - (i + 2);
 
         sphereIndices[(__int64)k + 2] = numVertices - 1;
         sphereIndices[k] = (numVertices - 1) - (i + 1);
@@ -474,20 +476,22 @@ HRESULT Renderer::LoadGeometry() {
         k += 3;
     }
 
-    skyboxIndices[k] = numVertices - 1;
-    skyboxIndices[(__int64)k + 2] = (numVertices - 1) - LongLines;
-    skyboxIndices[(__int64)k + 1] = numVertices - 2;
+    //skyboxIndices[k] = numVertices - 1;
+    //skyboxIndices[(__int64)k + 2] = (numVertices - 1) - LongLines;
+    //skyboxIndices[(__int64)k + 1] = numVertices - 2;
 
     sphereIndices[(__int64)k + 2] = numVertices - 1;
     sphereIndices[k] = (numVertices - 1) - LongLines;
     sphereIndices[(__int64)k + 1] = numVertices - 2;
 
-    HRESULT result = pGeometryManager_.loadGeometry(&skyboxVertices[0], sizeof(SimpleVertex) * numVertices,
+    /*HRESULT result = pGeometryManager_.loadGeometry(&skyboxVertices[0], sizeof(SimpleVertex) * numVertices,
         &skyboxIndices[0], sizeof(UINT) * numIndices, "skybox");
     if (SUCCEEDED(result)) {
         result = pGeometryManager_.loadGeometry(&sphereVertices[0], sizeof(Vertex) * numVertices,
             &sphereIndices[0], sizeof(UINT) * numIndices, "sphere");
-    }
+    }*/
+    HRESULT result = pGeometryManager_.loadGeometry(&sphereVertices[0], sizeof(Vertex) * numVertices,
+            &sphereIndices[0], sizeof(UINT) * numIndices, "sphere");
 
     return result;
 }
