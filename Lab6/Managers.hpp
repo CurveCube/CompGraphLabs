@@ -198,11 +198,13 @@ public:
         return SRV_;
     };
 
-    ~Texture() {
-        if (texture_ != nullptr)
-            texture_->Release();
-        if (SRV_ != nullptr)
-            SRV_->Release();
+    virtual void Cleanup() {
+        SAFE_RELEASE(texture_);
+        SAFE_RELEASE(SRV_);
+    };
+
+    virtual ~Texture() {
+        Cleanup();
     };
 
 private:
@@ -223,10 +225,13 @@ public:
         return RTV_;
     };
 
+    void Cleanup() {
+        Texture::Cleanup();
+        SAFE_RELEASE(RTV_);
+    };
+
     ~TextureWithRTV() {
-        if (RTV_ != nullptr) {
-            RTV_->Release();
-        }
+        Cleanup();
     };
 
 private:
