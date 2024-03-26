@@ -33,6 +33,7 @@
     <ClCompile Include="Lab6.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="SimpleManager.cpp" />
+    <ClCompile Include="SkyBox.cpp" />
     <ClCompile Include="textureLoaders\DDSTextureLoader11.cpp" />
     <ClCompile Include="ToneMapping.cpp" />
   </ItemGroup>
@@ -59,6 +60,8 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="ShaderManagers.hpp" />
+    <None Include="shaders\LightCalc.hlsli" />
+    <None Include="shaders\SceneMatrixBuffer.hlsli" />
     <ClInclude Include="SimpleManager.h" />
     <ClInclude Include="SimpleObject.h" />
     <ClInclude Include="SkyBox.h" />
@@ -76,6 +79,53 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="imgui\imgui.ini" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\brdfPS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\brdfVS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\brightnessPS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\copyToCubemapPS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\cubemapGeneratorIrradiancePS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\cubemapGeneratorPS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\cubemapGeneratorVS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\CubeMapPS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\CubeMapVS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\downsamplePS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\mappingVS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\prefilteredColorPS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\PS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\tonemapPS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\VS.hlsl">
+      <FileType>Document</FileType>
+    </None>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
