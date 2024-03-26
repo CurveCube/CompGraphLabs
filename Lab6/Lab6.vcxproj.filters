@@ -28,6 +28,10 @@
     <Filter Include="Исходные файлы\Загрузка текстур">
       <UniqueIdentifier>{ae09e868-822c-4901-a068-cc05dd775223}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{33b37f01-f0ee-495c-9620-a0950510951e}</UniqueIdentifier>
+      <Extensions>hlsl;hlsli</Extensions>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Renderer.cpp">
@@ -77,6 +81,9 @@
     </ClCompile>
     <ClCompile Include="textureLoaders\DDSTextureLoader11.cpp">
       <Filter>Исходные файлы\Загрузка текстур</Filter>
+    </ClCompile>
+    <ClCompile Include="SkyBox.cpp">
+      <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -184,6 +191,57 @@
   <ItemGroup>
     <None Include="imgui\imgui.ini">
       <Filter>Файлы ресурсов</Filter>
+    </None>
+    <None Include="shaders\brdfPS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\brdfVS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\brightnessPS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\copyToCubemapPS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\cubemapGeneratorIrradiancePS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\cubemapGeneratorPS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\cubemapGeneratorVS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\CubeMapPS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\CubeMapVS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\downsamplePS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\LightCalc.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\mappingVS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\prefilteredColorPS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\SceneMatrixBuffer.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\tonemapPS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\VS.hlsl">
+      <Filter>Shaders</Filter>
     </None>
   </ItemGroup>
 </Project>

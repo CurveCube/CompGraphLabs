@@ -528,9 +528,10 @@ HRESULT Renderer::LoadTextures() {
 }
 
 HRESULT Renderer::InitSkybox() {
-    skybox.worldMatrix = DirectX::XMMatrixIdentity();;
-    skybox.size = 1.0f;
-    HRESULT result = pGeometryManager_.get("skybox", skybox.geometry);
+    HRESULT result = S_OK;
+    //skybox.worldMatrix = DirectX::XMMatrixIdentity();;
+    //skybox.size = 1.0f;
+    //HRESULT result = pGeometryManager_.get("skybox", skybox.geometry);
     if (SUCCEEDED(result)) {
         result = pVSManager_.get("skybox", skybox.VS);
     }

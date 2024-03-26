@@ -37,16 +37,18 @@ private:
         UINT numIndices_;
     };
 
-
     struct SimpleVertex {
         XMFLOAT3 pos;
+    };
+
+    struct SkyboxWorldMatrixBuffer {
+        XMMATRIX worldMatrix;
+        XMFLOAT4 size;
     };
 public:
     Skybox() = default;
     void Init(ID3D11Device* pDevice);
     void SetCubmapTexture(SimpleTextureManager, std::string);
-
-
 
     void Cleanup() {
         VS.reset();

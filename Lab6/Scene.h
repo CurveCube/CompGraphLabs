@@ -4,7 +4,6 @@
 
 #include "framework.h"
 #include "Mesh.h"
-#include "SkyBox.h"
 #include "ShaderManagers.hpp"
 
 struct Node {
@@ -17,7 +16,6 @@ private:
     std::map<unsigned int, RoughMetallicMaterial> materials;
     std::map<unsigned int, Object> objects;
     std::map<unsigned int, Node> nodes;
-    Skybox skybox;
     PSManager psManager;
     VSManager vsManager;
 };

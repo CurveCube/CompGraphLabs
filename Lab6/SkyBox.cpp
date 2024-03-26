@@ -2,6 +2,8 @@
 #include <vector>
 
 void Skybox::Init(ID3D11Device* pDevice) {
+    worldMatrix = DirectX::XMMatrixIdentity();;
+    size = 1.0f;
     GenerateSphere(pDevice);
 }
 
