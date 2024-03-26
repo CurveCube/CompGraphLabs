@@ -1,4 +1,4 @@
-#include "shaders/SceneMatrixBuffer.h"
+#include "shaders/SceneMatrixBuffer.hlsli"
 
 cbuffer WorldMatrixBuffer : register (b0) {
     float4x4 worldMatrix;

@@ -1,4 +1,4 @@
-#include "shaders/SceneMatrixBuffer.h"
+#include "shaders/SceneMatrixBuffer.hlsli"
 
 TextureCube irradianceTexture : register (t0);
 SamplerState irradianceSampler : register (s0);
