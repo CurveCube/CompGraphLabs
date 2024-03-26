@@ -1,7 +1,7 @@
 #include "SimpleManager.h"
 #include "D3DInclude.h"
 #define STB_IMAGE_IMPLEMENTATION
-#include "textureLoaders/stb_image.h"
+#include "tinygltf/stb_image.h"
 
 
 HRESULT SimpleILManager::loadIL(const std::string& key, const D3D11_INPUT_ELEMENT_DESC* desc, UINT numElements, ID3D10Blob* VSBuffer) {
