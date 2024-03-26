@@ -1,13 +1,14 @@
 #include "Skybox.h"
 #include <vector>
 
-void Skybox::Init(ID3D11Device* pDevice) {
-    worldMatrix = DirectX::XMMatrixIdentity();;
-    size = 1.0f;
-    GenerateSphere(pDevice);
+HRESULT Skybox::Init(std::string textureName) {
+    HRESULT result = S_OK;
+    result = GenerateSphere();
+    
+    return result;
 }
 
-void Skybox::GenerateSphere(ID3D11Device* pDevice) {
+HRESULT Skybox::GenerateSphere() {
     UINT LatLines = 40, LongLines = 40;
     UINT numVertices = ((LatLines - 2) * LongLines) + 2;
     UINT numIndices = (((LatLines - 3) * (LongLines) * 2) + (LongLines * 2)) * 3;
@@ -93,15 +94,6 @@ void Skybox::GenerateSphere(ID3D11Device* pDevice) {
     indices[(__int64)k + 2] = (numVertices - 1) - LongLines;
     indices[(__int64)k + 1] = numVertices - 2;
 
-    /*HRESULT result = pGeometryManager_.loadGeometry(&skyboxVertices[0], sizeof(SimpleVertex) * numVertices,
-        &skyboxIndices[0], sizeof(UINT) * numIndices, "skybox");
-    if (SUCCEEDED(result)) {
-        result = pGeometryManager_.loadGeometry(&sphereVertices[0], sizeof(Vertex) * numVertices,
-            &sphereIndices[0], sizeof(UINT) * numIndices, "sphere");
-    }*/
-    //HRESULT result = pGeometryManager_.loadGeometry(&sphereVertices[0], sizeof(Vertex) * numVertices,
-    //    &sphereIndices[0], sizeof(UINT) * numIndices, "sphere");
-
     ID3D11Buffer* vertexBuffer = nullptr;
     ID3D11Buffer* indexBuffer = nullptr;
 
@@ -121,8 +113,8 @@ void Skybox::GenerateSphere(ID3D11Device* pDevice) {
     data.SysMemPitch = verticesBytes;
     data.SysMemSlicePitch = 0;
 
-
-    HRESULT result = pDevice->CreateBuffer(&desc, &data, &vertexBuffer);
+    HRESULT result = S_OK;
+    result = pDevice_->CreateBuffer(&desc, &data, &vertexBuffer);
 
     if (SUCCEEDED(result)) {
         D3D11_BUFFER_DESC desc = {};
@@ -138,14 +130,10 @@ void Skybox::GenerateSphere(ID3D11Device* pDevice) {
         data.SysMemPitch = indicesBytes;
         data.SysMemSlicePitch = 0;
 
-        result = pDevice->CreateBuffer(&desc, &data, &indexBuffer);
+        result = pDevice_->CreateBuffer(&desc, &data, &indexBuffer);
     }
 
-    /*if (SUCCEEDED(result)) {
-        objects_.emplace(key, std::make_shared<Geometry>(vertexBuffer, indexBuffer, indicesBytes / sizeof(UINT)));
-    }*/
+    geometry_ = std::make_unique<Geometry>(vertexBuffer, indexBuffer, numIndices);
 
-    geometry = std::make_unique<Geometry>(vertexBuffer, indexBuffer, numIndices);
-
-    //return result;
+    return result;
 }
