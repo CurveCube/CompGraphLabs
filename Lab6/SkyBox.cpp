@@ -1,12 +1,111 @@
 #include "Skybox.h"
+#include "Managers.hpp"
 #include <vector>
 
-HRESULT Skybox::Init(std::string textureName) {
+const D3D11_INPUT_ELEMENT_DESC Skybox::SimpleVertexDesc[] = {
+    {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+};
+
+HRESULT Skybox::Init(const std::wstring& textureName) {
     HRESULT result = S_OK;
     result = GenerateSphere();
-    
+
+    std::shared_ptr<Shader<ID3D11PixelShader>> PS;
+    std::shared_ptr<Shader<ID3D11VertexShader>> VS;
+    ID3D11InputLayout* inputLayout;
+
+    if (result == S_OK) {
+        auto PSShaderManager = ManagerStorage::GetInstance().GetPSManager();
+        result = PSShaderManager->GetShader(L"CubeMapPS.hlsl", {}, PS);
+    }
+
+    if (result == S_OK) {
+        auto VSShaderManager = ManagerStorage::GetInstance().GetVSManager();
+        result = VSShaderManager->GetShader(L"CubeMapVS.hlsl", {}, VS);
+    }
+
+    if (result == S_OK) {
+        HRESULT result = pDevice_->CreateInputLayout(SimpleVertexDesc,
+            sizeof(SimpleVertexDesc) / sizeof(SimpleVertexDesc[0]),
+            VS->GetShaderBuffer()->GetBufferPointer(),
+            VS->GetShaderBuffer()->GetBufferSize(),
+            &inputLayout);
+    }
+
+    if (result == S_OK) {
+        PS_ = PS->GetShader();
+        VS_ = VS->GetShader();
+        IL_ = std::make_unique<ID3D11InputLayout>(inputLayout);
+    }
+
+    if (result == S_OK) {
+        auto textureManager = ManagerStorage::GetInstance().GetTextureManager();
+        result = textureManager->GetTexture(textureName, texture_);
+    }
+
+    if (result = S_OK) {
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = sizeof(SkyboxWorldMatrixBuffer);
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+
+        SkyboxWorldMatrixBuffer worldMatrixBuffer;
+        worldMatrixBuffer.worldMatrix = DirectX::XMMatrixIdentity();
+        worldMatrixBuffer.size = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+
+        D3D11_SUBRESOURCE_DATA data;
+        data.pSysMem = &worldMatrixBuffer;
+        data.SysMemPitch = sizeof(worldMatrixBuffer);
+        data.SysMemSlicePitch = 0;
+
+        result = pDevice_->CreateBuffer(&desc, &data, &pWorldMatrixBuffer_);
+    }
+
     return result;
 }
+
+void Skybox::UpdateBuffer()
+{
+    SkyboxWorldMatrixBuffer skyboxWorldMatrixBuffer;
+    skyboxWorldMatrixBuffer.worldMatrix = worldMatrix_;
+    skyboxWorldMatrixBuffer.size = XMFLOAT4(size_, 0.0f, 0.0f, 0.0f);
+    pDeviceContext_->UpdateSubresource(pWorldMatrixBuffer_, 0, nullptr, &skyboxWorldMatrixBuffer, 0, 0);
+}
+
+void Skybox::SetSize(float size)
+{
+    size_ = size;
+}
+
+float Skybox::GetSize()
+{
+    return size_;
+}
+
+void Skybox::Render(ID3D11Buffer* pViewMatrixBuffer)
+{
+    ID3D11ShaderResourceView* resources[] = { texture_->GetSRV() };
+    pDeviceContext_->PSSetShaderResources(0, 1, resources);
+
+    pDeviceContext_->IASetIndexBuffer(geometry_->getIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
+    ID3D11Buffer* vertexBuffers[] = { geometry_->getVertexBuffer() };
+    UINT strides[] = { sizeof(SimpleVertex) };
+    UINT offsets[] = { 0 };
+    pDeviceContext_->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
+    pDeviceContext_->IASetInputLayout(IL_.get());
+    pDeviceContext_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    pDeviceContext_->VSSetShader(VS_.get(), nullptr, 0);
+    pDeviceContext_->VSSetConstantBuffers(0, 1, &pWorldMatrixBuffer_);
+    pDeviceContext_->VSSetConstantBuffers(1, 1, &pViewMatrixBuffer);
+    pDeviceContext_->PSSetShader(PS_.get(), nullptr, 0);
+
+    pDeviceContext_->DrawIndexed(geometry_->getNumIndices(), 0, 0);
+}
+
+
 
 HRESULT Skybox::GenerateSphere() {
     UINT LatLines = 40, LongLines = 40;
