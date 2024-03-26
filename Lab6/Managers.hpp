@@ -19,13 +19,13 @@ template<typename ST>
 class ShaderManagerBase {
 public:
     bool CheckShader(const std::wstring& name, const std::vector<std::string>& macros) {
-        return objects_.find(generateKey(name, macros)) != objects_.end();
+        return objects_.find(GenerateKey(name, macros)) != objects_.end();
     };
 
     virtual HRESULT LoadShader(const std::wstring& name, const std::vector<std::string>& macros) = 0;
 
     HRESULT GetShader(const std::wstring& name, const std::vector<std::string>& macros, std::shared_ptr<ST>& object) {
-        auto result = objects_.find(generateKey(name, macros));
+        auto result = objects_.find(GenerateKey(name, macros));
         if (result == objects_.end())
             return E_FAIL;
         else {
@@ -46,7 +46,7 @@ public:
 protected:
     ShaderManagerBase(const std::shared_ptr<ID3D11Device>& devicePtr, const std::wstring& folder) : device_(devicePtr), folder_(folder) {};
 
-    std::wstring generateKey(const std::wstring& name, const std::vector<std::string>& macros) {
+    std::wstring GenerateKey(const std::wstring& name, const std::vector<std::string>& macros) {
         std::wstring key = name + L"_";
         std::vector<std::string> tmp = macros;
         std::sort(tmp.begin(), tmp.end());
@@ -66,29 +66,25 @@ protected:
 
 
 template<typename T>
-class Shader {
-public:
-    Shader(T* shader, ID3D10Blob* buffer) :
+struct Shader {
+    std::shared_ptr<T> shader_;
+    std::shared_ptr<ID3D10Blob> shaderBuffer_;
+
+    Shader(T* shader = nullptr, ID3D10Blob* buffer = nullptr) :
         shader_(shader, utilities::DXPtrDeleter<T*>),
         shaderBuffer_(buffer, utilities::DXPtrDeleter<ID3D10Blob*>) {}
 
-    std::shared_ptr<T> GetShader() {
-        return shader_;
+    void SetWithDeleter(T* shader = nullptr, ID3D10Blob* buffer = nullptr) {
+        shader_ = std::shared_ptr<T>(shader, utilities::DXPtrDeleter<T*>);
+        shaderBuffer_ = std::shared_ptr<ID3D10Blob>(buffer, utilities::DXPtrDeleter<ID3D10Blob*>);
     }
 
-    std::shared_ptr<ID3D10Blob> GetShaderBuffer() {
-        return shaderBuffer_;
-    }
-
-    void Release() {
+    void Cleanup() {
         shader_.reset();
         shaderBuffer_.reset();
     };
 
     ~Shader() = default;
-private:
-    std::shared_ptr<T> shader_;
-    std::shared_ptr<ID3D10Blob> shaderBuffer_;
 };
 
 
@@ -126,9 +122,8 @@ public:
             result = device_->CreateVertexShader(vertexShaderBuffer->GetBufferPointer(), vertexShaderBuffer->GetBufferSize(), nullptr, &vertexShader);
         }
         if (SUCCEEDED(result)) {
-            objects_.emplace(generateKey(name, macros),
-                std::shared_ptr<Shader<ID3D11VertexShader>>(new Shader<ID3D11VertexShader>(vertexShader, vertexShaderBuffer),
-                    utilities::DXPtrDeleter<Shader<ID3D11VertexShader>*>));
+            objects_.emplace(GenerateKey(name, macros),
+                std::make_shared<Shader<ID3D11VertexShader>>(vertexShader, vertexShaderBuffer));
         }
         return result;
     };
@@ -171,9 +166,8 @@ public:
             result = device_->CreatePixelShader(pixelShaderBuffer->GetBufferPointer(), pixelShaderBuffer->GetBufferSize(), nullptr, &pixelShader);
         }
         if (SUCCEEDED(result)) {
-            objects_.emplace(generateKey(name, macros),
-                std::shared_ptr<Shader<ID3D11PixelShader>>(new Shader<ID3D11PixelShader>(pixelShader, pixelShaderBuffer),
-                    utilities::DXPtrDeleter<Shader<ID3D11PixelShader>*>));
+            objects_.emplace(GenerateKey(name, macros),
+                std::make_shared<Shader<ID3D11PixelShader>>(pixelShader, pixelShaderBuffer));
         }
         return result;
     };
@@ -182,72 +176,47 @@ public:
 };
 
 
-class Texture {
-public:
+struct Texture {
+    std::shared_ptr<ID3D11Resource> texture_;
+    std::shared_ptr<ID3D11ShaderResourceView> SRV_;
+
     Texture(ID3D11Resource* texture = nullptr, ID3D11ShaderResourceView* SRV = nullptr) :
-        texture_(texture), SRV_(SRV) {};
+        texture_(texture, utilities::DXPtrDeleter<ID3D11Resource*>),
+        SRV_(SRV, utilities::DXPtrDeleter<ID3D11ShaderResourceView*>) {};
 
-    Texture(Texture&) = delete;
-    Texture& operator=(Texture&) = delete;
+    void SetTextureWithDeleter(ID3D11Resource* texture = nullptr) {
+        texture_ = std::shared_ptr<ID3D11Resource>(texture, utilities::DXPtrDeleter<ID3D11Resource*>);
+    }
 
-    ID3D11Resource* GetResource() {
-        return texture_;
-    };
-
-    ID3D11ShaderResourceView* GetSRV() {
-        return SRV_;
-    };
-
-    virtual void Reset(ID3D11Resource* texture, ID3D11ShaderResourceView* SRV) {
-        Cleanup();
-        texture_ = texture;
-        SRV_ = SRV;
-    };
+    void SetSRVWithDeleter(ID3D11ShaderResourceView* SRV = nullptr) {
+        SRV_ = std::shared_ptr<ID3D11ShaderResourceView>(SRV, utilities::DXPtrDeleter<ID3D11ShaderResourceView*>);
+    }
 
     virtual void Cleanup() {
-        SAFE_RELEASE(texture_);
-        SAFE_RELEASE(SRV_);
+        texture_.reset();
+        SRV_.reset();
     };
 
-    virtual ~Texture() {
-        Cleanup();
-    };
-
-private:
-    ID3D11Resource* texture_;
-    ID3D11ShaderResourceView* SRV_;
+    virtual ~Texture() = default;
 };
 
 
 class TextureWithRTV : public Texture {
-public:
+    std::shared_ptr<ID3D11RenderTargetView> RTV_;
+
     TextureWithRTV(ID3D11Resource* texture = nullptr, ID3D11ShaderResourceView* SRV = nullptr, ID3D11RenderTargetView* RTV = nullptr) :
-        Texture(texture, SRV), RTV_(RTV) {};
+        Texture(texture, SRV), RTV_(RTV, utilities::DXPtrDeleter<ID3D11RenderTargetView*>) {};
 
-    TextureWithRTV(TextureWithRTV&) = delete;
-    TextureWithRTV& operator=(TextureWithRTV&) = delete;
-
-    ID3D11RenderTargetView* GetRTV() {
-        return RTV_;
-    };
-
-    void Reset(ID3D11Resource* texture, ID3D11ShaderResourceView* SRV, ID3D11RenderTargetView* RTV) {
-        Cleanup();
-        Texture::Reset(texture, SRV);
-        RTV_ = RTV;
-    };
+    void SetRTVWithDeleter(ID3D11RenderTargetView* RTV = nullptr) {
+        RTV_ = std::shared_ptr<ID3D11RenderTargetView>(RTV, utilities::DXPtrDeleter<ID3D11RenderTargetView*>);
+    }
 
     void Cleanup() {
         Texture::Cleanup();
-        SAFE_RELEASE(RTV_);
+        RTV_.reset();
     };
 
-    ~TextureWithRTV() {
-        Cleanup();
-    };
-
-private:
-    ID3D11RenderTargetView* RTV_;
+    ~TextureWithRTV() = default;
 };
 
 
@@ -421,6 +390,13 @@ public:
 
     std::shared_ptr<TextureManager> GetTextureManager() {
         return textureManager_;
+    };
+
+    void Cleanup() {
+        VSManager_->Cleanup();
+        PSManager_->Cleanup();
+        textureManager_->Cleanup();
+        isInit = false;
     };
 
 private:
