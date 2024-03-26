@@ -184,18 +184,24 @@ public:
 
 class Texture {
 public:
-    Texture(ID3D11Resource* texture, ID3D11ShaderResourceView* SRV) :
+    Texture(ID3D11Resource* texture = nullptr, ID3D11ShaderResourceView* SRV = nullptr) :
         texture_(texture), SRV_(SRV) {};
 
     Texture(Texture&) = delete;
     Texture& operator=(Texture&) = delete;
 
-    ID3D11Resource* getResource() {
+    ID3D11Resource* GetResource() {
         return texture_;
     };
 
-    ID3D11ShaderResourceView* getSRV() {
+    ID3D11ShaderResourceView* GetSRV() {
         return SRV_;
+    };
+
+    virtual void Reset(ID3D11Resource* texture, ID3D11ShaderResourceView* SRV) {
+        Cleanup();
+        texture_ = texture;
+        SRV_ = SRV;
     };
 
     virtual void Cleanup() {
@@ -215,14 +221,20 @@ private:
 
 class TextureWithRTV : public Texture {
 public:
-    TextureWithRTV(ID3D11Resource* texture, ID3D11ShaderResourceView* SRV, ID3D11RenderTargetView* RTV) :
+    TextureWithRTV(ID3D11Resource* texture = nullptr, ID3D11ShaderResourceView* SRV = nullptr, ID3D11RenderTargetView* RTV = nullptr) :
         Texture(texture, SRV), RTV_(RTV) {};
 
     TextureWithRTV(TextureWithRTV&) = delete;
     TextureWithRTV& operator=(TextureWithRTV&) = delete;
 
-    ID3D11RenderTargetView* getRTV() {
+    ID3D11RenderTargetView* GetRTV() {
         return RTV_;
+    };
+
+    void Reset(ID3D11Resource* texture, ID3D11ShaderResourceView* SRV, ID3D11RenderTargetView* RTV) {
+        Cleanup();
+        Texture::Reset(texture, SRV);
+        RTV_ = RTV;
     };
 
     void Cleanup() {
