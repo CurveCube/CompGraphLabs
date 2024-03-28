@@ -14,36 +14,39 @@ HRESULT Skybox::Init(const std::wstring& textureName) {
     std::shared_ptr<Shader<ID3D11VertexShader>> VS;
     ID3D11InputLayout* inputLayout;
 
-    if (result == S_OK) {
+    if (!ManagerStorage::GetInstance().IsInited())
+        return E_FAIL;
+
+    if (SUCCEEDED(result)) {
         auto PSShaderManager = ManagerStorage::GetInstance().GetPSManager();
         result = PSShaderManager->GetShader(L"CubeMapPS.hlsl", {}, PS);
     }
 
-    if (result == S_OK) {
+    if (SUCCEEDED(result)) {
         auto VSShaderManager = ManagerStorage::GetInstance().GetVSManager();
         result = VSShaderManager->GetShader(L"CubeMapVS.hlsl", {}, VS);
     }
 
-    if (result == S_OK) {
+    if (SUCCEEDED(result)) {
         HRESULT result = pDevice_->CreateInputLayout(SimpleVertexDesc,
             sizeof(SimpleVertexDesc) / sizeof(SimpleVertexDesc[0]),
-            VS->GetShaderBuffer()->GetBufferPointer(),
-            VS->GetShaderBuffer()->GetBufferSize(),
+            VS->shaderBuffer_->GetBufferPointer(),
+            VS->shaderBuffer_->GetBufferSize(),
             &inputLayout);
     }
 
-    if (result == S_OK) {
-        PS_ = PS->GetShader();
-        VS_ = VS->GetShader();
+    if (SUCCEEDED(result)) {
+        PS_ = PS->shader_;
+        VS_ = VS->shader_;
         IL_ = std::make_unique<ID3D11InputLayout>(inputLayout);
     }
 
-    if (result == S_OK) {
+    if (SUCCEEDED(result)) {
         auto textureManager = ManagerStorage::GetInstance().GetTextureManager();
         result = textureManager->GetTexture(textureName, texture_);
     }
 
-    if (result = S_OK) {
+    if (SUCCEEDED(result)) {
         D3D11_BUFFER_DESC desc = {};
         desc.ByteWidth = sizeof(SkyboxWorldMatrixBuffer);
         desc.Usage = D3D11_USAGE_DEFAULT;
@@ -87,7 +90,7 @@ float Skybox::GetSize()
 
 void Skybox::Render(ID3D11Buffer* pViewMatrixBuffer)
 {
-    ID3D11ShaderResourceView* resources[] = { texture_->GetSRV() };
+    ID3D11ShaderResourceView* resources[] = { texture_->SRV_.get() };
     pDeviceContext_->PSSetShaderResources(0, 1, resources);
 
     pDeviceContext_->IASetIndexBuffer(geometry_->getIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
