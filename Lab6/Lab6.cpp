@@ -1,14 +1,12 @@
-﻿// Lab6.cpp : Определяет точку входа для приложения.
-//
-
-#include "Lab6.h"
+﻿#include "Lab6.h"
 #include "Renderer.h"
+#include <windowsx.h>
 
 #define MAX_LOADSTRING 100
 
-HINSTANCE hInst;                                  // текущий экземпляр
-WCHAR szTitle[MAX_LOADSTRING];                    // текст строки заголовка
-WCHAR szWindowClass[MAX_LOADSTRING];              // имя класса главного окна
+HINSTANCE hInst;
+WCHAR szTitle[MAX_LOADSTRING];
+WCHAR szWindowClass[MAX_LOADSTRING];
 
 ATOM                 MyRegisterClass(HINSTANCE hInstance);
 BOOL                 InitInstance(HINSTANCE, int);
@@ -21,7 +19,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE     hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
-    // Инициализация глобальных строк
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
     LoadStringW(hInstance, IDI_LAB6, szWindowClass, MAX_LOADSTRING);
     MyRegisterClass(hInstance);
@@ -36,7 +33,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE     hInstance,
         SetCurrentDirectory(dir.c_str());
     }
 
-    // Выполнить инициализацию приложения:
     if (!InitInstance(hInstance, nCmdShow)) {
         return FALSE;
     }
@@ -46,7 +42,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE     hInstance,
     MSG msg;
     Renderer& renderer = Renderer::GetInstance();
 
-    // Цикл основного сообщения:
     bool exit = false;
     while (!exit) {
         if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE) > 0) {
@@ -86,7 +81,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance) {
 }
 
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow) {
-    hInst = hInstance; // Сохранить маркер экземпляра в глобальной переменной
+    hInst = hInstance;
 
     HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
@@ -136,11 +131,47 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
             Renderer::GetInstance().Resize(rc.right - rc.left, rc.bottom - rc.top);
         }
         break;
+    case WM_KEYDOWN:
+        {
+            int upDown = 0, rightLeft = 0, forwardBack = 0;
+            if (GetKeyState('W') & 0x8000 || GetKeyState(VK_UP) & 0x8000) {
+                ++forwardBack;
+            }
+            if (GetKeyState('S') & 0x8000 || GetKeyState(VK_DOWN) & 0x8000) {
+                --forwardBack;
+            }
+            if (GetKeyState('D') & 0x8000 || GetKeyState(VK_RIGHT) & 0x8000) {
+                --rightLeft;
+            }
+            if (GetKeyState('A') & 0x8000 || GetKeyState(VK_LEFT) & 0x8000) {
+                ++rightLeft;
+            }
+            if (GetKeyState('Q') & 0x8000 || GetKeyState(VK_RSHIFT) & 0x8000) {
+                ++upDown;
+            }
+            if (GetKeyState('E') & 0x8000 || GetKeyState(VK_RCONTROL) & 0x8000) {
+                --upDown;
+            }
+            Renderer::GetInstance().MoveCamera(upDown, rightLeft, forwardBack);
+        }
+        break;
+    case WM_MOUSEWHEEL:
+        Renderer::GetInstance().OnMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
+        break;
+    case WM_RBUTTONDOWN:
+        Renderer::GetInstance().OnMouseRButtonDown(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        break;
+    case WM_MOUSEMOVE:
+        Renderer::GetInstance().OnMouseMove(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        break;
+    case WM_RBUTTONUP:
+        Renderer::GetInstance().OnMouseRButtonUp();
+        break;
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
-    return 0;
+    return TRUE;
 }

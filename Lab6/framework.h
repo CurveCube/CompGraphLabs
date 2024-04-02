@@ -14,17 +14,14 @@
 #include <memory.h>
 #include <tchar.h>
 
-#define DIRECTINPUT_VERSION 0x0800
-
 #define SAFE_RELEASE(A) if ((A) != NULL) { (A)->Release(); (A) = NULL; }
+#define MAX_LIGHT 3
 
 #include <d3dcompiler.h>
 #include <dxgi.h>
 #include <d3d11.h>
 #include <d3d11_1.h>
-#include <dinput.h>
 #include <directxmath.h>
-#include "textureLoaders/DDSTextureLoader11.h"
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_dx11.h"
 #include "imgui/imgui_impl_win32.h"

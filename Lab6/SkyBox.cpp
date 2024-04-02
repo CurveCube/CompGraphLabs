@@ -1,124 +1,151 @@
 #include "Skybox.h"
-#include "Managers.hpp"
-#include <vector>
 
-const D3D11_INPUT_ELEMENT_DESC Skybox::SimpleVertexDesc[] = {
+const std::vector<D3D11_INPUT_ELEMENT_DESC> Skybox::VertexDesc = {
     {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
 };
 
-HRESULT Skybox::Init(const std::wstring& textureName) {
-    HRESULT result = S_OK;
-    result = GenerateSphere();
-
-    std::shared_ptr<Shader<ID3D11PixelShader>> PS;
-    std::shared_ptr<Shader<ID3D11VertexShader>> VS;
-    ID3D11InputLayout* inputLayout;
-
-    if (!ManagerStorage::GetInstance().IsInited())
+HRESULT Skybox::Init(const std::shared_ptr<Device>& device, const std::shared_ptr<ManagerStorage>& managerStorage,
+    const std::shared_ptr<Camera>& camera, const std::shared_ptr<ID3D11ShaderResourceView>& cubemapTexture) {
+    if (!managerStorage->IsInit() || !device->IsInit()) {
         return E_FAIL;
-
-    if (SUCCEEDED(result)) {
-        auto PSShaderManager = ManagerStorage::GetInstance().GetPSManager();
-        result = PSShaderManager->GetShader(L"CubeMapPS.hlsl", {}, PS);
     }
 
-    if (SUCCEEDED(result)) {
-        auto VSShaderManager = ManagerStorage::GetInstance().GetVSManager();
-        result = VSShaderManager->GetShader(L"CubeMapVS.hlsl", {}, VS);
-    }
+    device_ = device;
+    managerStorage_ = managerStorage;
+    camera_ = camera;
 
+    SetCubeMapTexture(cubemapTexture);
+    HRESULT result = GenerateSphere();
     if (SUCCEEDED(result)) {
-        HRESULT result = pDevice_->CreateInputLayout(SimpleVertexDesc,
-            sizeof(SimpleVertexDesc) / sizeof(SimpleVertexDesc[0]),
-            VS->shaderBuffer_->GetBufferPointer(),
-            VS->shaderBuffer_->GetBufferSize(),
-            &inputLayout);
+        result = managerStorage_->GetVSManager()->LoadShader(VS_, L"shaders/cubemapVS.hlsl", {}, VertexDesc);
     }
-
     if (SUCCEEDED(result)) {
-        PS_ = PS->shader_;
-        VS_ = VS->shader_;
-        IL_ = std::make_unique<ID3D11InputLayout>(inputLayout);
+        result = managerStorage_->GetPSManager()->LoadShader(PS_, L"shaders/cubemapPS.hlsl");
     }
-
-    if (SUCCEEDED(result)) {
-        auto textureManager = ManagerStorage::GetInstance().GetTextureManager();
-        result = textureManager->GetTexture(textureName, texture_);
-    }
-
     if (SUCCEEDED(result)) {
         D3D11_BUFFER_DESC desc = {};
-        desc.ByteWidth = sizeof(SkyboxWorldMatrixBuffer);
+        desc.ByteWidth = sizeof(WorldMatrixBuffer);
         desc.Usage = D3D11_USAGE_DEFAULT;
         desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         desc.CPUAccessFlags = 0;
         desc.MiscFlags = 0;
         desc.StructureByteStride = 0;
 
-        SkyboxWorldMatrixBuffer worldMatrixBuffer;
-        worldMatrixBuffer.worldMatrix = DirectX::XMMatrixIdentity();
-        worldMatrixBuffer.size = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+        WorldMatrixBuffer worldMatrixBuffer;
+        worldMatrixBuffer.worldMatrix = worldMatrix_;
+        worldMatrixBuffer.size = XMFLOAT4(size_, 0.0f, 0.0f, 0.0f);
 
         D3D11_SUBRESOURCE_DATA data;
         data.pSysMem = &worldMatrixBuffer;
         data.SysMemPitch = sizeof(worldMatrixBuffer);
         data.SysMemSlicePitch = 0;
 
-        result = pDevice_->CreateBuffer(&desc, &data, &pWorldMatrixBuffer_);
+        result = device_->GetDevice()->CreateBuffer(&desc, &data, &worldMatrixBuffer_);
+    }
+    if (SUCCEEDED(result)) {
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = sizeof(ViewMatrixBuffer);
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+
+        ViewMatrixBuffer viewMatrixBuffer;
+        XMFLOAT3 pos = camera_->GetPosition();
+        viewMatrixBuffer.viewProjectionMatrix = camera_->GetViewProjectionMatrix();
+        viewMatrixBuffer.cameraPos = XMFLOAT4(pos.x, pos.y, pos.z, 1.0f);
+
+        D3D11_SUBRESOURCE_DATA data;
+        data.pSysMem = &viewMatrixBuffer;
+        data.SysMemPitch = sizeof(viewMatrixBuffer);
+        data.SysMemSlicePitch = 0;
+
+        result = device_->GetDevice()->CreateBuffer(&desc, &data, &viewMatrixBuffer_);
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetStateManager()->CreateDepthStencilState(dsState_, D3D11_COMPARISON_GREATER_EQUAL, D3D11_DEPTH_WRITE_MASK_ZERO);
     }
 
     return result;
 }
 
-void Skybox::UpdateBuffer()
-{
-    SkyboxWorldMatrixBuffer skyboxWorldMatrixBuffer;
-    skyboxWorldMatrixBuffer.worldMatrix = worldMatrix_;
-    skyboxWorldMatrixBuffer.size = XMFLOAT4(size_, 0.0f, 0.0f, 0.0f);
-    pDeviceContext_->UpdateSubresource(pWorldMatrixBuffer_, 0, nullptr, &skyboxWorldMatrixBuffer, 0, 0);
+bool Skybox::Resize(UINT width, UINT height) {
+    if (!IsInit()) {
+        return false;
+    }
+
+    float n = camera_->GetNearPlane();
+    float fov = camera_->GetFov();
+    float halfW = tanf(fov / 2) * n;
+    float halfH = width / float(height) * halfW;
+    size_ = sqrtf(n * n + halfH * halfH + halfW * halfW) * 1.1f;
+
+    return true;
 }
 
-void Skybox::SetSize(float size)
-{
-    size_ = size;
-}
+bool Skybox::Render() {
+    if (!IsInit()) {
+        return false;
+    }
 
-float Skybox::GetSize()
-{
-    return size_;
-}
+    WorldMatrixBuffer worldMatrixBuffer;
+    worldMatrixBuffer.worldMatrix = worldMatrix_;
+    worldMatrixBuffer.size = XMFLOAT4(size_, 0.0f, 0.0f, 0.0f);
+    device_->GetDeviceContext()->UpdateSubresource(worldMatrixBuffer_, 0, nullptr, &worldMatrixBuffer, 0, 0);
 
-void Skybox::Render(ID3D11Buffer* pViewMatrixBuffer)
-{
-    ID3D11ShaderResourceView* resources[] = { texture_->SRV_.get() };
-    pDeviceContext_->PSSetShaderResources(0, 1, resources);
+    ViewMatrixBuffer viewMatrixBuffer;
+    XMFLOAT3 pos = camera_->GetPosition();
+    viewMatrixBuffer.viewProjectionMatrix = camera_->GetViewProjectionMatrix();
+    viewMatrixBuffer.cameraPos = XMFLOAT4(pos.x, pos.y, pos.z, 1.0f);
+    device_->GetDeviceContext()->UpdateSubresource(viewMatrixBuffer_, 0, nullptr, &viewMatrixBuffer, 0, 0);
 
-    pDeviceContext_->IASetIndexBuffer(geometry_->getIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
-    ID3D11Buffer* vertexBuffers[] = { geometry_->getVertexBuffer() };
-    UINT strides[] = { sizeof(SimpleVertex) };
+    std::shared_ptr<ID3D11SamplerState> sampler;
+    HRESULT result = managerStorage_->GetStateManager()->CreateSamplerState(sampler, D3D11_FILTER_ANISOTROPIC);
+    if (FAILED(result)) {
+        return false;
+    }
+
+    ID3D11SamplerState* samplers[] = { sampler.get() };
+    device_->GetDeviceContext()->PSSetSamplers(0, 1, samplers);
+
+    ID3D11ShaderResourceView* resources[] = { cubemapTexture_.get() };
+    device_->GetDeviceContext()->PSSetShaderResources(0, 1, resources);
+
+    device_->GetDeviceContext()->OMSetDepthStencilState(dsState_.get(), 0);
+
+    std::shared_ptr<ID3D11RasterizerState> rasterizerState;
+    result = managerStorage_->GetStateManager()->CreateRasterizerState(rasterizerState);
+    if (FAILED(result)) {
+        return false;
+    }
+    device_->GetDeviceContext()->RSSetState(rasterizerState.get());
+
+    device_->GetDeviceContext()->IASetIndexBuffer(indexBuffer_, DXGI_FORMAT_R32_UINT, 0);
+    ID3D11Buffer* vertexBuffers[] = { vertexBuffer_ };
+    UINT strides[] = { sizeof(Vertex) };
     UINT offsets[] = { 0 };
-    pDeviceContext_->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
-    pDeviceContext_->IASetInputLayout(IL_.get());
-    pDeviceContext_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    pDeviceContext_->VSSetShader(VS_.get(), nullptr, 0);
-    pDeviceContext_->VSSetConstantBuffers(0, 1, &pWorldMatrixBuffer_);
-    pDeviceContext_->VSSetConstantBuffers(1, 1, &pViewMatrixBuffer);
-    pDeviceContext_->PSSetShader(PS_.get(), nullptr, 0);
+    device_->GetDeviceContext()->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
+    device_->GetDeviceContext()->IASetInputLayout(VS_->GetInputLayout().get());
+    device_->GetDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    device_->GetDeviceContext()->VSSetShader(VS_->GetShader().get(), nullptr, 0);
+    device_->GetDeviceContext()->VSSetConstantBuffers(0, 1, &worldMatrixBuffer_);
+    device_->GetDeviceContext()->VSSetConstantBuffers(1, 1, &viewMatrixBuffer_);
+    device_->GetDeviceContext()->PSSetShader(PS_->GetShader().get(), nullptr, 0);
+    device_->GetDeviceContext()->DrawIndexed(numIndices_, 0, 0);
 
-    pDeviceContext_->DrawIndexed(geometry_->getNumIndices(), 0, 0);
+    return true;
 }
-
-
 
 HRESULT Skybox::GenerateSphere() {
     UINT LatLines = 40, LongLines = 40;
     UINT numVertices = ((LatLines - 2) * LongLines) + 2;
-    UINT numIndices = (((LatLines - 3) * (LongLines) * 2) + (LongLines * 2)) * 3;
+    numIndices_ = (((LatLines - 3) * (LongLines) * 2) + (LongLines * 2)) * 3;
 
     float phi = 0.0f;
     float theta = 0.0f;
 
-    std::vector<SimpleVertex> vertices(numVertices);
+    std::vector<Vertex> vertices(numVertices);
 
     XMVECTOR currVertPos = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
 
@@ -144,7 +171,7 @@ HRESULT Skybox::GenerateSphere() {
     vertices[(__int64)numVertices - 1].pos.y = 0.0f;
     vertices[(__int64)numVertices - 1].pos.z = -1.0f;
 
-    std::vector<UINT> indices(numIndices);
+    std::vector<UINT> indices(numIndices_);
 
     UINT k = 0;
     for (UINT i = 0; i < LongLines - 1; i++) {
@@ -196,11 +223,8 @@ HRESULT Skybox::GenerateSphere() {
     indices[(__int64)k + 2] = (numVertices - 1) - LongLines;
     indices[(__int64)k + 1] = numVertices - 2;
 
-    ID3D11Buffer* vertexBuffer = nullptr;
-    ID3D11Buffer* indexBuffer = nullptr;
-
-    UINT verticesBytes = sizeof(SimpleVertex) * numVertices;
-    UINT indicesBytes = sizeof(UINT) * numIndices;
+    UINT verticesBytes = sizeof(Vertex) * numVertices;
+    UINT indicesBytes = sizeof(UINT) * numIndices_;
 
     D3D11_BUFFER_DESC desc = {};
     desc.ByteWidth = verticesBytes;
@@ -216,7 +240,7 @@ HRESULT Skybox::GenerateSphere() {
     data.SysMemSlicePitch = 0;
 
     HRESULT result = S_OK;
-    result = pDevice_->CreateBuffer(&desc, &data, &vertexBuffer);
+    result = device_->GetDevice()->CreateBuffer(&desc, &data, &vertexBuffer_);
 
     if (SUCCEEDED(result)) {
         D3D11_BUFFER_DESC desc = {};
@@ -232,10 +256,23 @@ HRESULT Skybox::GenerateSphere() {
         data.SysMemPitch = indicesBytes;
         data.SysMemSlicePitch = 0;
 
-        result = pDevice_->CreateBuffer(&desc, &data, &indexBuffer);
+        result = device_->GetDevice()->CreateBuffer(&desc, &data, &indexBuffer_);
     }
-
-    geometry_ = std::make_unique<Geometry>(vertexBuffer, indexBuffer, numIndices);
 
     return result;
 }
+
+void Skybox::Cleanup() {
+    device_.reset();
+    managerStorage_.reset();
+    camera_.reset();
+    VS_.reset();
+    PS_.reset();
+    cubemapTexture_.reset();
+    dsState_.reset();
+
+    SAFE_RELEASE(vertexBuffer_);
+    SAFE_RELEASE(indexBuffer_);
+    SAFE_RELEASE(worldMatrixBuffer_);
+    SAFE_RELEASE(viewMatrixBuffer_);
+};

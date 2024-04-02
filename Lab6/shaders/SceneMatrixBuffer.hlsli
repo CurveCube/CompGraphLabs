@@ -7,5 +7,5 @@ cbuffer SceneMatrixBuffer : register (b1) {
     float4x4 viewProjectionMatrix;
     float4 cameraPos;
     int4 lightParams;
-    LIGHT lights[10];
+    LIGHT lights[3];
 };

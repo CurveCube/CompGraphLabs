@@ -1,21 +1,20 @@
 #pragma once
 
-#include "framework.h"
-#include "SimpleManager.h"
+#include "ManagerStorage.hpp"
 #include <vector>
 #include <chrono>
 
 class ToneMapping {
-    struct Texture {
+    struct RawPtrTexture {
         ID3D11Texture2D* texture = nullptr;
         ID3D11RenderTargetView* RTV = nullptr;
         ID3D11ShaderResourceView* SRV = nullptr;
     };
 
     struct ScaledFrame {
-        Texture avg;
-        Texture min;
-        Texture max;
+        RawPtrTexture avg;
+        RawPtrTexture min;
+        RawPtrTexture max;
     };
 
     struct AdaptBuffer {
@@ -24,55 +23,69 @@ class ToneMapping {
 
 public:
     ToneMapping() = default;
-    ~ToneMapping();
 
-    HRESULT Init(std::shared_ptr <ID3D11Device> device, std::shared_ptr <ID3D11DeviceContext> deviceContext,
-                 SimpleVSManager& VSManager, SimplePSManager& PSManager, SimpleSamplerManager& samplerManager,
-                 int textureWidth, int textureHeight);
-    void SetRenderTarget();
-    void ClearRenderTarget();
-    void RenderBrightness();
-    void RenderTonemap();
-    void ResetEyeAdaptation();
-    HRESULT Resize(int textureWidth, int textureHeight);
+    HRESULT Init(const std::shared_ptr<Device>& device, const std::shared_ptr<ManagerStorage>& managerStorage,
+        int textureWidth, int textureHeight);
+    bool CalculateBrightness();
+    bool RenderTonemap();
+    bool Resize(int textureWidth, int textureHeight);
     void Cleanup();
+
+    bool IsInit() const {
+        return !!device_;
+    };
+
+    std::shared_ptr<ID3D11RenderTargetView> GetRenderTarget() const {
+        return frameRTV_;
+    };
+
+    void ResetEyeAdaptation() {
+        adapt = -1.0f;
+    };
+
     void SetFactor(float f) {
         factor = f;
     };
-    float GetFactor() {
+
+    float GetFactor() const {
         return factor;
-    }
+    };
+
+    ~ToneMapping() {
+        Cleanup();
+    };
 
 private:
     HRESULT CreateTextures(int textureWidth, int textureHeight);
     HRESULT CreateScaledFrame(ScaledFrame& scaledFrame, int num);
-    HRESULT CreateTexture(Texture& texture, int textureWidth, int textureHeight, DXGI_FORMAT format);
+    HRESULT CreateTexture(RawPtrTexture& texture, int textureWidth, int textureHeight, DXGI_FORMAT format);
     HRESULT CreateTexture2D(ID3D11Texture2D** texture, int textureWidth, int textureHeight, DXGI_FORMAT format, bool CPUAccess = false);
-    void CleanUpTextures();
+    void CleanupTextures();
 
-private:
-    std::shared_ptr <ID3D11Device> m_device;
-    std::shared_ptr <ID3D11DeviceContext> m_deviceContext;
+    std::shared_ptr<Device> device_; // provided externally <-
+    std::shared_ptr<ManagerStorage> managerStorage_; // provided externally <-
 
-    Texture m_frame;
+    ID3D11Texture2D* frame_ = nullptr; // always remains only inside the class #
+    ID3D11ShaderResourceView* frameSRV_ = nullptr; // always remains only inside the class #
+    std::shared_ptr<ID3D11RenderTargetView> frameRTV_; // transmitted outward ->
+
+    ID3D11Texture2D* readAvgTexture_ = nullptr; // always remains only inside the class #
+    ID3D11Buffer* adaptBuffer_ = nullptr; // always remains only inside the class #
+
+    std::shared_ptr<ID3D11SamplerState> samplerAvg_; // provided externally <-
+    std::shared_ptr<ID3D11SamplerState> samplerMin_; // provided externally <-
+    std::shared_ptr<ID3D11SamplerState> samplerMax_; // provided externally <-
+    std::shared_ptr<ID3D11SamplerState> samplerDefault_; // provided externally <-
+
+    std::shared_ptr<VertexShader> mappingVS_; // provided externally <-
+    std::shared_ptr<PixelShader> brightnessPS_; // provided externally <-
+    std::shared_ptr<PixelShader> downsamplePS_; // provided externally <-
+    std::shared_ptr<PixelShader> tonemapPS_; // provided externally <-
+
+    std::vector<ScaledFrame> scaledFrames_;  // always remains only inside the class #
+    std::chrono::time_point<std::chrono::steady_clock> lastFrameTime_;
+
     int n = 0;
-
-    ID3D11Texture2D* m_readAvgTexture = nullptr;
-
-    ID3D11Buffer* m_adaptBuffer = nullptr;
-
-    std::shared_ptr <ID3D11SamplerState> m_sampler_avg;
-    std::shared_ptr <ID3D11SamplerState> m_sampler_min;
-    std::shared_ptr <ID3D11SamplerState> m_sampler_max;
-
-    std::shared_ptr <ID3D11VertexShader> m_mappingVS;
-    std::shared_ptr <ID3D11PixelShader> m_brightnessPS;
-    std::shared_ptr <ID3D11PixelShader> m_downsamplePS;
-    std::shared_ptr <ID3D11PixelShader> m_toneMapPS;
-
-    std::vector<ScaledFrame> m_scaledFrames;
-    std::chrono::time_point<std::chrono::steady_clock> m_lastFrame;
-
     float adapt = -1.0f;
     float factor = 1.0f;
     float s = 0.5f;

@@ -1,86 +1,95 @@
 #pragma once
 
-#include "framework.h"
-#include <memory>
-#include "SimpleManager.h"
-#include <vector>
+#include "ManagerStorage.hpp"
 
-class CubemapGenerator
-{
+
+class CubemapGenerator {
     static const UINT sideSize = 512;
     static const UINT irradianceSideSize = 32;
     static const UINT prefilteredSideSize = 128;
 
-    struct SimpleVertex {
+    enum Sides {
+        XPLUS,
+        XMINUS,
+        YPLUS,
+        YMINUS,
+        ZPLUS,
+        ZMINUS
+    };
+
+    struct Vertex {
         XMFLOAT3 pos;
     };
 
-    struct CameraBuffer {
-        XMMATRIX viewProjMatrix;
+    struct ViewMatrixBuffer {
+        XMMATRIX viewProjectionMatrix;
     };
 
     struct RoughnessBuffer {
         XMFLOAT4 roughness;
     };
 
+    struct Side {
+        ID3D11Buffer* vertexBuffer_ = nullptr;
+        ID3D11Buffer* indexBuffer_ = nullptr;
+        UINT numIndices_ = 6;
+    };
+
 public:
-    CubemapGenerator(std::shared_ptr<ID3D11Device>&, std::shared_ptr <ID3D11DeviceContext>&,
-        SimpleSamplerManager&, SimpleTextureManager&,
-        SimpleILManager&, SimplePSManager&,
-        SimpleVSManager&, SimpleGeometryManager&);
+    CubemapGenerator(const std::shared_ptr<Device>& device, const std::shared_ptr<ManagerStorage>& managerStorage);
 
-    HRESULT init();
-
-    HRESULT generateEnvironmentMap(const std::string&);
-    HRESULT generateIrradianceMap(const std::string&, const std::string&);
-    HRESULT generatePrefilteredMap(const std::string&, const std::string&);
-    HRESULT generateBRDF(const std::string&);
-
+    HRESULT Init();
+    HRESULT GenerateEnvironmentMap(const std::string& hdrname, std::shared_ptr<ID3D11ShaderResourceView>& environmentMap);
+    HRESULT GenerateIrradianceMap(std::shared_ptr<ID3D11ShaderResourceView>& irradianceMap);
+    HRESULT GeneratePrefilteredMap(std::shared_ptr<ID3D11ShaderResourceView>& prefilteredMap);
+    HRESULT GenerateBRDF(std::shared_ptr<ID3D11ShaderResourceView>& BRDF);
     void Cleanup();
+
+    bool IsInit() {
+        return !!viewMatrixBuffer_;
+    };
 
     ~CubemapGenerator() {
         Cleanup();
-        SAFE_RELEASE(pCameraBuffer);
-        SAFE_RELEASE(pRoughnessBuffer);
     }
 
 private:
-    HRESULT createTexture(UINT);
-    HRESULT createBRDFTexture(const std::string&);
-    HRESULT createCubemapTexture(UINT, const std::string&, bool withMipMap);
-    HRESULT createBuffer();
-    HRESULT renderToCubeMap(UINT, int, ID3D11RenderTargetView*);
-    HRESULT createGeometry();
-    HRESULT renderMapSide(int);
-    HRESULT renderIrradianceMapSide(const std::string&, int);
-    HRESULT renderPrefilteredColor(const std::string&, int, int, int);
-    HRESULT createCubemapRTV(const std::string&);
-    HRESULT createPrefilteredRTV(const std::string&, int, int);
-    HRESULT renderBRDF();
+    HRESULT CreateSides();
+    HRESULT CreateSide(const std::vector<Vertex>& vertices, const std::vector<UINT>& indices);
+    HRESULT CreateBuffers();
+    HRESULT CreateCubemapTexture(UINT size, ID3D11Texture2D** texture, std::shared_ptr<ID3D11ShaderResourceView>& SRV, bool withMipMap = false);
+    HRESULT CreateCubemapSubRTV(ID3D11Texture2D* texture, Sides side);
+    HRESULT CreatePrefilteredSubRTV(Sides side, int mipSlice);
+    HRESULT CreateBRDFTexture();
+    HRESULT RenderEnvironmentMapSide(Sides side);
+    HRESULT RenderIrradianceMapSide(Sides side);
+    HRESULT RenderPrefilteredMap(Sides side, int mipSlice, int mipMapSize);
+    HRESULT RenderBRDF();
+    void CleanupSubResources();
 
-private:
-    std::shared_ptr<ID3D11Device> device_;
-    std::shared_ptr <ID3D11DeviceContext> deviceContext_;
+    static const std::vector<D3D11_INPUT_ELEMENT_DESC> VertexDesc;
 
-    SimpleSamplerManager& samplerManager_;
-    SimpleTextureManager& textureManager_;
-    SimpleILManager& ILManager_;
-    SimplePSManager& PSManager_;
-    SimpleVSManager& VSManager_;
-    SimpleGeometryManager& GManager_;
+    std::shared_ptr<Device> device_; // provided externally <-
+    std::shared_ptr<ManagerStorage> managerStorage_; // provided externally <-
+    std::shared_ptr<Texture> hdrtexture_; // provided externally <-
 
-    ID3D11Texture2D* subTexture = nullptr;
-    ID3D11RenderTargetView* subRTV = nullptr;
-    ID3D11ShaderResourceView* subSRV = nullptr;
-    ID3D11RenderTargetView* cubemapRTV[6] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
-    ID3D11Buffer* pCameraBuffer = nullptr;
-    ID3D11RenderTargetView* prefilteredRTV = nullptr;
-    ID3D11Buffer* pRoughnessBuffer = nullptr;
+    ID3D11Buffer* viewMatrixBuffer_ = nullptr; // always remains only inside the class #
+    ID3D11Buffer* roughnessBuffer_ = nullptr; // always remains only inside the class #
 
-    ID3D11RenderTargetView* brdfRTV = nullptr;
+    std::shared_ptr<ID3D11ShaderResourceView> environmentMap_; // transmitted outward ->
+    std::shared_ptr<ID3D11ShaderResourceView> irradianceMap_; // transmitted outward ->
+    std::shared_ptr<ID3D11ShaderResourceView> prefilteredMap_; // transmitted outward ->
+    std::shared_ptr<ID3D11ShaderResourceView> BRDF_; // transmitted outward ->
 
-    DirectX::XMMATRIX projectionMatrix = XMMatrixPerspectiveFovLH(XM_PI / 2, 1.0f, 0.1f, 10.0f);
-    std::vector<DirectX::XMMATRIX> viewMatrices;
-    std::vector<std::string> sides;
-    std::vector<float> prefilteredRoughness;
+    std::vector<Side> sides_; // always remains only inside the class #
+
+    ID3D11Texture2D* environmentMapTexture_ = nullptr; // always remains only inside the class #
+    ID3D11Texture2D* irradianceMapTexture_ = nullptr; // always remains only inside the class #
+    ID3D11Texture2D* prefilteredMapTexture_ = nullptr; // always remains only inside the class #
+    ID3D11Texture2D* BRDFTexture_ = nullptr; // always remains only inside the class #
+    ID3D11RenderTargetView* subRTV_ = nullptr; // always remains only inside the class #
+
+    XMMATRIX projectionMatrix_ = XMMatrixPerspectiveFovLH(XM_PI / 2, 1.0f, 0.1f, 10.0f);
+    std::vector<XMMATRIX> viewMatrices_;
+    std::vector<float> prefilteredRoughness_;
 };

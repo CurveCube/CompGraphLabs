@@ -1,8 +1,11 @@
-#include "shaders/SceneMatrixBuffer.hlsli"
-
 cbuffer WorldMatrixBuffer : register (b0) {
     float4x4 worldMatrix;
     float4 size;
+};
+
+cbuffer ViewMatrixBuffer : register (b1) {
+    float4x4 viewProjectionMatrix;
+    float4 cameraPos;
 };
 
 struct VS_INPUT {
@@ -19,7 +22,7 @@ PS_INPUT main(VS_INPUT input) {
 
     float3 pos = cameraPos.xyz + input.position * size.x;
     output.position = mul(viewProjectionMatrix, mul(worldMatrix, float4(pos, 1.0f)));
-    output.position.z =  0.0f;
+    output.position.z = 0.0f;
     output.localPos = input.position;
 
     return output;

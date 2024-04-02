@@ -13,51 +13,42 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Файлы заголовков\Загрузка текстур">
-      <UniqueIdentifier>{92374cbe-b053-40ac-a4c6-338a8f839db6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Файлы заголовков\Общие заголовки">
-      <UniqueIdentifier>{621e753b-f457-40fb-97b5-1c29bddc0cdc}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Файлы заголовков\imgui">
       <UniqueIdentifier>{cdd16a55-0fbc-4416-bdfb-05cd33c36c4f}</UniqueIdentifier>
     </Filter>
     <Filter Include="Исходные файлы\imgui">
       <UniqueIdentifier>{e5bd2992-7c7a-4fb2-8eb0-8e0f1c67e0aa}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Исходные файлы\Загрузка текстур">
-      <UniqueIdentifier>{ae09e868-822c-4901-a068-cc05dd775223}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Shaders">
       <UniqueIdentifier>{33b37f01-f0ee-495c-9620-a0950510951e}</UniqueIdentifier>
       <Extensions>hlsl;hlsli</Extensions>
     </Filter>
+    <Filter Include="Файлы заголовков\tinygltf">
+      <UniqueIdentifier>{92374cbe-b053-40ac-a4c6-338a8f839db6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Файлы заголовков\Менеджеры">
+      <UniqueIdentifier>{ceb2f831-40cc-4d03-b956-da072bda5d86}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Файлы заголовков\Вспомогательное">
+      <UniqueIdentifier>{621e753b-f457-40fb-97b5-1c29bddc0cdc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Файлы заголовков\Отрисовщик">
+      <UniqueIdentifier>{ae7e6b81-4b36-4ebc-b216-9dafed08bb2b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\Отрисовщик">
+      <UniqueIdentifier>{81f7ad9d-bfdf-4abf-afa0-5ea4a4b23f78}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Файлы заголовков\Сцена">
+      <UniqueIdentifier>{f3a2c643-fcad-4fba-b560-4bb05c547292}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\Сцена">
+      <UniqueIdentifier>{dc5efc82-d7fa-43e3-bcf5-ce6c016b3cf5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\Менеджеры">
+      <UniqueIdentifier>{2c7c76bd-8ab5-43e2-a74c-f51dcd69089f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Renderer.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="SimpleManager.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="ToneMapping.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="Camera.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="CubemapGenerator.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="D3DInclude.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="Input.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="Lab6.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
     <ClCompile Include="imgui\imgui_tables.cpp">
       <Filter>Исходные файлы\imgui</Filter>
     </ClCompile>
@@ -79,59 +70,26 @@
     <ClCompile Include="imgui\imgui_impl_win32.cpp">
       <Filter>Исходные файлы\imgui</Filter>
     </ClCompile>
-    <ClCompile Include="textureLoaders\DDSTextureLoader11.cpp">
-      <Filter>Исходные файлы\Загрузка текстур</Filter>
+    <ClCompile Include="Lab6.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="ToneMapping.cpp">
+      <Filter>Исходные файлы\Отрисовщик</Filter>
     </ClCompile>
     <ClCompile Include="SkyBox.cpp">
-      <Filter>Исходные файлы</Filter>
+      <Filter>Исходные файлы\Отрисовщик</Filter>
+    </ClCompile>
+    <ClCompile Include="CubemapGenerator.cpp">
+      <Filter>Исходные файлы\Отрисовщик</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer.cpp">
+      <Filter>Исходные файлы\Отрисовщик</Filter>
+    </ClCompile>
+    <ClCompile Include="TextureManager.cpp">
+      <Filter>Исходные файлы\Менеджеры</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Camera.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="CubemapGenerator.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="D3DInclude.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="Input.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="Renderer.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="SimpleManager.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="SimpleObject.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="SkyBox.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="ToneMapping.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="Utilities.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="textureLoaders\DDSTextureLoader11.h">
-      <Filter>Файлы заголовков\Загрузка текстур</Filter>
-    </ClInclude>
-    <ClInclude Include="textureLoaders\stb_image.h">
-      <Filter>Файлы заголовков\Загрузка текстур</Filter>
-    </ClInclude>
-    <ClInclude Include="resource.h">
-      <Filter>Файлы заголовков\Общие заголовки</Filter>
-    </ClInclude>
-    <ClInclude Include="targetver.h">
-      <Filter>Файлы заголовков\Общие заголовки</Filter>
-    </ClInclude>
-    <ClInclude Include="framework.h">
-      <Filter>Файлы заголовков\Общие заголовки</Filter>
-    </ClInclude>
     <ClInclude Include="imgui\imgui_impl_win32.h">
       <Filter>Файлы заголовков\imgui</Filter>
     </ClInclude>
@@ -156,12 +114,6 @@
     <ClInclude Include="imgui\imgui_impl_dx11.h">
       <Filter>Файлы заголовков\imgui</Filter>
     </ClInclude>
-    <ClInclude Include="Lab6.h">
-      <Filter>Файлы заголовков\Общие заголовки</Filter>
-    </ClInclude>
-    <ClInclude Include="ShaderManagers.hpp">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
     <ClInclude Include="Scene.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
@@ -177,8 +129,74 @@
     <ClInclude Include="Buffers.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="Managers.hpp">
+    <ClInclude Include="tinygltf\json.hpp">
+      <Filter>Файлы заголовков\tinygltf</Filter>
+    </ClInclude>
+    <ClInclude Include="tinygltf\stb_image.h">
+      <Filter>Файлы заголовков\tinygltf</Filter>
+    </ClInclude>
+    <ClInclude Include="tinygltf\stb_image_write.h">
+      <Filter>Файлы заголовков\tinygltf</Filter>
+    </ClInclude>
+    <ClInclude Include="tinygltf\tiny_gltf.h">
+      <Filter>Файлы заголовков\tinygltf</Filter>
+    </ClInclude>
+    <ClInclude Include="D3DInclude.hpp">
+      <Filter>Файлы заголовков\Вспомогательное</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities.hpp">
+      <Filter>Файлы заголовков\Вспомогательное</Filter>
+    </ClInclude>
+    <ClInclude Include="ShaderManagers.hpp">
+      <Filter>Файлы заголовков\Менеджеры</Filter>
+    </ClInclude>
+    <ClInclude Include="TextureManager.h">
+      <Filter>Файлы заголовков\Менеджеры</Filter>
+    </ClInclude>
+    <ClInclude Include="StateManager.hpp">
+      <Filter>Файлы заголовков\Менеджеры</Filter>
+    </ClInclude>
+    <ClInclude Include="ManagerStorage.hpp">
+      <Filter>Файлы заголовков\Менеджеры</Filter>
+    </ClInclude>
+    <ClInclude Include="Lab6.h">
       <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="framework.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="targetver.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="Device.hpp">
+      <Filter>Файлы заголовков\Отрисовщик</Filter>
+    </ClInclude>
+    <ClInclude Include="SwapChain.hpp">
+      <Filter>Файлы заголовков\Отрисовщик</Filter>
+    </ClInclude>
+    <ClInclude Include="ToneMapping.h">
+      <Filter>Файлы заголовков\Отрисовщик</Filter>
+    </ClInclude>
+    <ClInclude Include="Camera.hpp">
+      <Filter>Файлы заголовков\Отрисовщик</Filter>
+    </ClInclude>
+    <ClInclude Include="SkyBox.h">
+      <Filter>Файлы заголовков\Отрисовщик</Filter>
+    </ClInclude>
+    <ClInclude Include="CubemapGenerator.h">
+      <Filter>Файлы заголовков\Отрисовщик</Filter>
+    </ClInclude>
+    <ClInclude Include="Light.h">
+      <Filter>Файлы заголовков\Сцена</Filter>
+    </ClInclude>
+    <ClInclude Include="SimpleObject.hpp">
+      <Filter>Файлы заголовков\Отрисовщик</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer.h">
+      <Filter>Файлы заголовков\Отрисовщик</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -204,9 +222,6 @@
     <None Include="shaders\brightnessPS.hlsl">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="shaders\copyToCubemapPS.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
     <None Include="shaders\cubemapGeneratorIrradiancePS.hlsl">
       <Filter>Shaders</Filter>
     </None>
@@ -216,10 +231,10 @@
     <None Include="shaders\cubemapGeneratorVS.hlsl">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="shaders\CubeMapPS.hlsl">
+    <None Include="shaders\cubemapPS.hlsl">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="shaders\CubeMapVS.hlsl">
+    <None Include="shaders\cubemapVS.hlsl">
       <Filter>Shaders</Filter>
     </None>
     <None Include="shaders\downsamplePS.hlsl">
