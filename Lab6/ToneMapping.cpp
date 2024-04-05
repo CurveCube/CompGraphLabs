@@ -8,6 +8,7 @@ void ToneMapping::Cleanup() {
     samplerAvg_.reset();
     samplerMin_.reset();
     samplerMax_.reset();
+    samplerDefault_.reset();
     mappingVS_.reset();
     brightnessPS_.reset();
     downsamplePS_.reset();

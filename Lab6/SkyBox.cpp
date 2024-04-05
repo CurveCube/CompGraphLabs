@@ -66,6 +66,12 @@ HRESULT Skybox::Init(const std::shared_ptr<Device>& device, const std::shared_pt
     if (SUCCEEDED(result)) {
         result = managerStorage_->GetStateManager()->CreateDepthStencilState(dsState_, D3D11_COMPARISON_GREATER_EQUAL, D3D11_DEPTH_WRITE_MASK_ZERO);
     }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetStateManager()->CreateSamplerState(sampler_, D3D11_FILTER_ANISOTROPIC);
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetStateManager()->CreateRasterizerState(rasterizerState_);
+    }
 
     return result;
 }
@@ -100,26 +106,13 @@ bool Skybox::Render() {
     viewMatrixBuffer.cameraPos = XMFLOAT4(pos.x, pos.y, pos.z, 1.0f);
     device_->GetDeviceContext()->UpdateSubresource(viewMatrixBuffer_, 0, nullptr, &viewMatrixBuffer, 0, 0);
 
-    std::shared_ptr<ID3D11SamplerState> sampler;
-    HRESULT result = managerStorage_->GetStateManager()->CreateSamplerState(sampler, D3D11_FILTER_ANISOTROPIC);
-    if (FAILED(result)) {
-        return false;
-    }
-
-    ID3D11SamplerState* samplers[] = { sampler.get() };
+    ID3D11SamplerState* samplers[] = { sampler_.get() };
     device_->GetDeviceContext()->PSSetSamplers(0, 1, samplers);
 
     ID3D11ShaderResourceView* resources[] = { cubemapTexture_.get() };
     device_->GetDeviceContext()->PSSetShaderResources(0, 1, resources);
-
     device_->GetDeviceContext()->OMSetDepthStencilState(dsState_.get(), 0);
-
-    std::shared_ptr<ID3D11RasterizerState> rasterizerState;
-    result = managerStorage_->GetStateManager()->CreateRasterizerState(rasterizerState);
-    if (FAILED(result)) {
-        return false;
-    }
-    device_->GetDeviceContext()->RSSetState(rasterizerState.get());
+    device_->GetDeviceContext()->RSSetState(rasterizerState_.get());
 
     device_->GetDeviceContext()->IASetIndexBuffer(indexBuffer_, DXGI_FORMAT_R32_UINT, 0);
     ID3D11Buffer* vertexBuffers[] = { vertexBuffer_ };
@@ -270,6 +263,8 @@ void Skybox::Cleanup() {
     PS_.reset();
     cubemapTexture_.reset();
     dsState_.reset();
+    sampler_.reset();
+    rasterizerState_.reset();
 
     SAFE_RELEASE(vertexBuffer_);
     SAFE_RELEASE(indexBuffer_);

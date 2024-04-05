@@ -374,7 +374,7 @@ bool Renderer::Resize(UINT width, UINT height) {
 void Renderer::MoveCamera(int upDown, int rightLeft, int forwardBack) {
     float dx = camera_->GetDistanceToFocus() * forwardBack / 30.0f,
         dy = camera_->GetDistanceToFocus() * upDown / 30.0f,
-        dz = -camera_->GetDistanceToFocus() * rightLeft / 30.0f;
+        dz = camera_->GetDistanceToFocus() * rightLeft / 30.0f;
     camera_->Move(dx, dy, dz);
 }
 

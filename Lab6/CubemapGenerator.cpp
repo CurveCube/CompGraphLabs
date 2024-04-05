@@ -51,6 +51,16 @@ HRESULT CubemapGenerator::Init() {
     if (SUCCEEDED(result)) {
         result = CreateBuffers();
     }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetStateManager()->CreateSamplerState(samplerDefault_, D3D11_FILTER_ANISOTROPIC);
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetStateManager()->CreateRasterizerState(rasterizerState_);
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetStateManager()->CreateSamplerState(samplerAvg_, D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP,
+            D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP);
+    }
     return result;
 }
 
@@ -218,6 +228,7 @@ HRESULT CubemapGenerator::GenerateEnvironmentMap(const std::string& hdrname, std
 
     if (SUCCEEDED(result)) {
         environmentMap = environmentMap_;
+        device_->GetDeviceContext()->GenerateMips(environmentMap_.get());
     }
 
     return result;
@@ -341,6 +352,9 @@ void CubemapGenerator::Cleanup() {
     irradianceMap_.reset();
     prefilteredMap_.reset();
     BRDF_.reset();
+    samplerDefault_.reset();
+    rasterizerState_.reset();
+    samplerAvg_.reset();
 
     for (auto& side : sides_) {
         SAFE_RELEASE(side.indexBuffer_);
@@ -395,12 +409,7 @@ HRESULT CubemapGenerator::RenderBRDF() {
     device_->GetDeviceContext()->RSSetViewports(1, &viewport);
 
     device_->GetDeviceContext()->OMSetDepthStencilState(nullptr, 0);
-    std::shared_ptr<ID3D11RasterizerState> rasterizerState;
-    result = managerStorage_->GetStateManager()->CreateRasterizerState(rasterizerState);
-    if (FAILED(result)) {
-        return result;
-    }
-    device_->GetDeviceContext()->RSSetState(rasterizerState.get());
+    device_->GetDeviceContext()->RSSetState(rasterizerState_.get());
     device_->GetDeviceContext()->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
     device_->GetDeviceContext()->IASetInputLayout(vs->GetInputLayout().get());
     device_->GetDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -461,18 +470,12 @@ HRESULT CubemapGenerator::RenderEnvironmentMapSide(Sides side) {
     ID3D11ShaderResourceView* resources[] = { hdrtexture_->GetSRV().get() };
     device_->GetDeviceContext()->PSSetShaderResources(0, 1, resources);
 
-    std::shared_ptr<ID3D11SamplerState> sampler;
-    HRESULT result = managerStorage_->GetStateManager()->CreateSamplerState(sampler, D3D11_FILTER_ANISOTROPIC);
-    if (FAILED(result)) {
-        return result;
-    }
-
-    ID3D11SamplerState* samplers[] = { sampler.get() };
+    ID3D11SamplerState* samplers[] = { samplerDefault_.get() };
     device_->GetDeviceContext()->PSSetSamplers(0, 1, samplers);
 
     std::shared_ptr<VertexShader> vs;
     std::shared_ptr<PixelShader> ps;
-    result = managerStorage_->GetVSManager()->LoadShader(vs, L"shaders/cubemapGeneratorVS.hlsl", {}, VertexDesc);
+    HRESULT result = managerStorage_->GetVSManager()->LoadShader(vs, L"shaders/cubemapGeneratorVS.hlsl", {}, VertexDesc);
     if (FAILED(result)) {
         return result;
     }
@@ -501,12 +504,7 @@ HRESULT CubemapGenerator::RenderEnvironmentMapSide(Sides side) {
     device_->GetDeviceContext()->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
     device_->GetDeviceContext()->IASetIndexBuffer(sides_[side].indexBuffer_, DXGI_FORMAT_R32_UINT, 0);
     device_->GetDeviceContext()->OMSetDepthStencilState(nullptr, 0);
-    std::shared_ptr<ID3D11RasterizerState> rasterizerState;
-    result = managerStorage_->GetStateManager()->CreateRasterizerState(rasterizerState);
-    if (FAILED(result)) {
-        return result;
-    }
-    device_->GetDeviceContext()->RSSetState(rasterizerState.get());
+    device_->GetDeviceContext()->RSSetState(rasterizerState_.get());
     device_->GetDeviceContext()->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
     device_->GetDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     device_->GetDeviceContext()->VSSetShader(vs->GetShader().get(), nullptr, 0);
@@ -523,18 +521,12 @@ HRESULT CubemapGenerator::RenderIrradianceMapSide(Sides side) {
     ID3D11ShaderResourceView* resources[] = { environmentMap_.get() };
     device_->GetDeviceContext()->PSSetShaderResources(0, 1, resources);
 
-    std::shared_ptr<ID3D11SamplerState> sampler;
-    HRESULT result = managerStorage_->GetStateManager()->CreateSamplerState(sampler, D3D11_FILTER_ANISOTROPIC);
-    if (FAILED(result)) {
-        return result;
-    }
-
-    ID3D11SamplerState* samplers[] = { sampler.get() };
+    ID3D11SamplerState* samplers[] = { samplerDefault_.get() };
     device_->GetDeviceContext()->PSSetSamplers(0, 1, samplers);
 
     std::shared_ptr<VertexShader> vs;
     std::shared_ptr<PixelShader> ps;
-    result = managerStorage_->GetVSManager()->LoadShader(vs, L"shaders/cubemapGeneratorVS.hlsl", {}, VertexDesc);
+    HRESULT result = managerStorage_->GetVSManager()->LoadShader(vs, L"shaders/cubemapGeneratorVS.hlsl", {}, VertexDesc);
     if (FAILED(result)) {
         return result;
     }
@@ -563,12 +555,7 @@ HRESULT CubemapGenerator::RenderIrradianceMapSide(Sides side) {
     device_->GetDeviceContext()->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
     device_->GetDeviceContext()->IASetIndexBuffer(sides_[side].indexBuffer_, DXGI_FORMAT_R32_UINT, 0);
     device_->GetDeviceContext()->OMSetDepthStencilState(nullptr, 0);
-    std::shared_ptr<ID3D11RasterizerState> rasterizerState;
-    result = managerStorage_->GetStateManager()->CreateRasterizerState(rasterizerState);
-    if (FAILED(result)) {
-        return result;
-    }
-    device_->GetDeviceContext()->RSSetState(rasterizerState.get());
+    device_->GetDeviceContext()->RSSetState(rasterizerState_.get());
     device_->GetDeviceContext()->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
     device_->GetDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     device_->GetDeviceContext()->VSSetShader(vs->GetShader().get(), nullptr, 0);
@@ -585,19 +572,12 @@ HRESULT CubemapGenerator::RenderPrefilteredMap(Sides side, int mipSlice, int mip
     ID3D11ShaderResourceView* resources[] = { environmentMap_.get() };
     device_->GetDeviceContext()->PSSetShaderResources(0, 1, resources);
 
-    std::shared_ptr<ID3D11SamplerState> sampler;
-    HRESULT result = managerStorage_->GetStateManager()->CreateSamplerState(sampler, D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP,
-        D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP);
-    if (FAILED(result)) {
-        return result;
-    }
-
-    ID3D11SamplerState* samplers[] = { sampler.get() };
+    ID3D11SamplerState* samplers[] = { samplerAvg_.get() };
     device_->GetDeviceContext()->PSSetSamplers(0, 1, samplers);
 
     std::shared_ptr<VertexShader> vs;
     std::shared_ptr<PixelShader> ps;
-    result = managerStorage_->GetVSManager()->LoadShader(vs, L"shaders/cubemapGeneratorVS.hlsl", {}, VertexDesc);
+    HRESULT result = managerStorage_->GetVSManager()->LoadShader(vs, L"shaders/cubemapGeneratorVS.hlsl", {}, VertexDesc);
     if (FAILED(result)) {
         return result;
     }
@@ -630,12 +610,7 @@ HRESULT CubemapGenerator::RenderPrefilteredMap(Sides side, int mipSlice, int mip
     device_->GetDeviceContext()->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
     device_->GetDeviceContext()->IASetIndexBuffer(sides_[side].indexBuffer_, DXGI_FORMAT_R32_UINT, 0);
     device_->GetDeviceContext()->OMSetDepthStencilState(nullptr, 0);
-    std::shared_ptr<ID3D11RasterizerState> rasterizerState;
-    result = managerStorage_->GetStateManager()->CreateRasterizerState(rasterizerState);
-    if (FAILED(result)) {
-        return result;
-    }
-    device_->GetDeviceContext()->RSSetState(rasterizerState.get());
+    device_->GetDeviceContext()->RSSetState(rasterizerState_.get());
     device_->GetDeviceContext()->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
     device_->GetDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     device_->GetDeviceContext()->VSSetShader(vs->GetShader().get(), nullptr, 0);

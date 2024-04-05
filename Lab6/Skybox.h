@@ -59,6 +59,8 @@ private:
     std::shared_ptr<VertexShader> VS_; // provided externally <-
     std::shared_ptr<PixelShader> PS_; // provided externally <-
     std::shared_ptr<ID3D11DepthStencilState> dsState_; // provided externally <-
+    std::shared_ptr<ID3D11SamplerState> sampler_; // provided externally <-
+    std::shared_ptr<ID3D11RasterizerState> rasterizerState_; // provided externally <-
 
     UINT numIndices_ = 0;
     XMMATRIX worldMatrix_;

@@ -88,6 +88,16 @@ public:
         if (SUCCEEDED(result)) {
             result = managerStorage_->GetStateManager()->CreateDepthStencilState(dsState_);
         }
+        if (SUCCEEDED(result)) {
+            result = managerStorage_->GetStateManager()->CreateRasterizerState(rasterizerState_);
+        }
+        if (SUCCEEDED(result)) {
+            result = managerStorage_->GetStateManager()->CreateSamplerState(samplerDefault_, D3D11_FILTER_ANISOTROPIC);
+        }
+        if (SUCCEEDED(result)) {
+            result = managerStorage_->GetStateManager()->CreateSamplerState(samplerAvg_, D3D11_FILTER_MIN_MAG_MIP_LINEAR,
+                D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP);
+        }
 
         return result;
     };
@@ -122,32 +132,13 @@ public:
         }
         device_->GetDeviceContext()->Unmap(viewMatrixBuffer_, 0);
 
-        std::shared_ptr<ID3D11SamplerState> samplerDefault;
-        result = managerStorage_->GetStateManager()->CreateSamplerState(samplerDefault, D3D11_FILTER_ANISOTROPIC);
-        if (FAILED(result)) {
-            return false;
-        }
-        std::shared_ptr<ID3D11SamplerState> samplerAvg;
-        result = managerStorage_->GetStateManager()->CreateSamplerState(samplerAvg, D3D11_FILTER_MIN_MAG_MIP_LINEAR,
-            D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP);
-        if (FAILED(result)) {
-            return false;
-        }
-
-        ID3D11SamplerState* samplers[] = { samplerDefault.get(), samplerAvg.get() };
+        ID3D11SamplerState* samplers[] = { samplerDefault_.get(), samplerAvg_.get() };
         device_->GetDeviceContext()->PSSetSamplers(0, 2, samplers);
 
         ID3D11ShaderResourceView* resources[] = { irradianceMap.get(), prefilteredMap.get(), BRDF.get() };
         device_->GetDeviceContext()->PSSetShaderResources(0, 3, resources);
-
         device_->GetDeviceContext()->OMSetDepthStencilState(dsState_.get(), 0);
-
-        std::shared_ptr<ID3D11RasterizerState> rasterizerState;
-        result = managerStorage_->GetStateManager()->CreateRasterizerState(rasterizerState);
-        if (FAILED(result)) {
-            return false;
-        }
-        device_->GetDeviceContext()->RSSetState(rasterizerState.get());
+        device_->GetDeviceContext()->RSSetState(rasterizerState_.get());
 
         device_->GetDeviceContext()->IASetIndexBuffer(indexBuffer_, DXGI_FORMAT_R32_UINT, 0);
         ID3D11Buffer* vertexBuffers[] = { vertexBuffer_ };
@@ -196,6 +187,9 @@ public:
         PSNDF_.reset();
         PSGeometry_.reset();
         dsState_.reset();
+        samplerDefault_.reset();
+        samplerAvg_.reset();
+        rasterizerState_.reset();
 
         SAFE_RELEASE(vertexBuffer_);
         SAFE_RELEASE(indexBuffer_);
@@ -385,6 +379,9 @@ private:
     std::shared_ptr<PixelShader> PSNDF_; // provided externally <-
     std::shared_ptr<PixelShader> PSGeometry_; // provided externally <-
     std::shared_ptr<ID3D11DepthStencilState> dsState_; // provided externally <-
+    std::shared_ptr<ID3D11SamplerState> samplerDefault_; // provided externally <-
+    std::shared_ptr<ID3D11SamplerState> samplerAvg_; // provided externally <-
+    std::shared_ptr<ID3D11RasterizerState> rasterizerState_; // provided externally <-
 
     UINT numIndices_ = 0;
     XMMATRIX worldMatrix_;

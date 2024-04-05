@@ -81,6 +81,10 @@ private:
     std::shared_ptr<ID3D11ShaderResourceView> prefilteredMap_; // transmitted outward ->
     std::shared_ptr<ID3D11ShaderResourceView> BRDF_; // transmitted outward ->
 
+    std::shared_ptr<ID3D11RasterizerState> rasterizerState_; // provided externally <-
+    std::shared_ptr<ID3D11SamplerState> samplerDefault_; // provided externally <-
+    std::shared_ptr<ID3D11SamplerState> samplerAvg_; // provided externally <-
+
     std::vector<Side> sides_; // always remains only inside the class #
 
     ID3D11Texture2D* environmentMapTexture_ = nullptr; // always remains only inside the class #
