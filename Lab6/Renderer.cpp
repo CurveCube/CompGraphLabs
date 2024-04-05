@@ -44,7 +44,7 @@ bool Renderer::Init(HINSTANCE hInstance, HWND hWnd) {
     }
     if (SUCCEEDED(result)) {
         camera_ = std::shared_ptr<Camera>(new Camera(XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 3.0f, 3.0f), XM_PI / 3, width_,
-            height_, 0.1f, 100.0f));
+            height_, 0.01f, 100.0f));
     }
     if (SUCCEEDED(result)) {
         result = skybox_.Init(device_, managerStorage_, camera_, environmentMap_);
@@ -374,7 +374,7 @@ bool Renderer::Resize(UINT width, UINT height) {
 void Renderer::MoveCamera(int upDown, int rightLeft, int forwardBack) {
     float dx = camera_->GetDistanceToFocus() * forwardBack / 30.0f,
         dy = camera_->GetDistanceToFocus() * upDown / 30.0f,
-        dz = camera_->GetDistanceToFocus() * rightLeft / 30.0f;
+        dz = -camera_->GetDistanceToFocus() * rightLeft / 30.0f;
     camera_->Move(dx, dy, dz);
 }
 
@@ -389,7 +389,7 @@ void Renderer::OnMouseRButtonDown(int x, int y) {
 
 void Renderer::OnMouseMove(int x, int y) {
     if (mousePrevX_ >= 0) {
-        camera_->Rotate((x - mousePrevX_) / 200.0f, (y - mousePrevY_) / 200.0f);
+        camera_->Rotate((mousePrevX_ - x) / 200.0f, (y - mousePrevY_) / 200.0f);
         mousePrevX_ = x;
         mousePrevY_ = y;
     }

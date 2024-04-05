@@ -79,7 +79,7 @@ public:
         fov_ = fov;
         near_ = nearPlane;
         far_ = farPlane;
-        projectionMatrix_ = XMMatrixPerspectiveFovLH(fov_, width / height, far_, near_);
+        projectionMatrix_ = XMMatrixPerspectiveFovRH(fov_, width / height, far_, near_);
     };
 
     const XMMATRIX& GetViewMatrix() const {
@@ -125,7 +125,7 @@ private:
         float upTheta = theta_ + XM_PIDIV2;
         XMFLOAT3 up = XMFLOAT3(cosf(upTheta) * cosf(phi_), sinf(upTheta), cosf(upTheta) * sinf(phi_));
 
-        viewMatrix_ = XMMatrixLookAtLH(
+        viewMatrix_ = XMMatrixLookAtRH(
             XMVectorSet(position_.x, position_.y, position_.z, 0.0f),
             XMVectorSet(focus_.x, focus_.y, focus_.z, 0.0f),
             XMVectorSet(up.x, up.y, up.z, 0.0f)
