@@ -38,11 +38,16 @@ public:
     };
 
 private:
-    Renderer() : width_(defaultWidth), height_(defaultHeight) {};
+    Renderer();
 
     HRESULT InitImgui(HWND hWnd);
+    HRESULT CreateDepthStencilViews();
     HRESULT GenerateTextures();
     void UpdateImgui();
+
+    static const UINT shadowMapSize = 1024;
+    D3D11_VIEWPORT shadowMapViewport_;
+    D3D11_VIEWPORT viewport_;
 
     std::shared_ptr<IDXGIFactory> factory_; // transmitted outward ->
     std::shared_ptr<IDXGIAdapter> selectedAdapter_; // transmitted outward ->
@@ -60,13 +65,15 @@ private:
     Skybox skybox_;
     SimpleObject sphere_;
 
-    std::vector<Light> lights_;
+    std::vector<SpotLight> lights_;
 
 #ifdef _DEBUG
     ID3DUserDefinedAnnotation* pAnnotation_ = nullptr; // always remains only inside the class #
 #endif // _DEBUG
     ID3D11Texture2D* depthBuffer_ = nullptr; // always remains only inside the class #
     ID3D11DepthStencilView* depthStencilView_ = nullptr; // always remains only inside the class #
+    ID3D11Texture2D* shadowBuffers_[CSM_SPLIT_COUNT]; // always remains only inside the class #
+    ID3D11DepthStencilView* shadowViews_[CSM_SPLIT_COUNT]; // always remains only inside the class #
 
     bool default_ = true;
     unsigned int width_ = defaultWidth;

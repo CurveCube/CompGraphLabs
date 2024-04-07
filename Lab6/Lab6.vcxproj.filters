@@ -76,9 +76,6 @@
     <ClCompile Include="ToneMapping.cpp">
       <Filter>Исходные файлы\Отрисовщик</Filter>
     </ClCompile>
-    <ClCompile Include="SkyBox.cpp">
-      <Filter>Исходные файлы\Отрисовщик</Filter>
-    </ClCompile>
     <ClCompile Include="CubemapGenerator.cpp">
       <Filter>Исходные файлы\Отрисовщик</Filter>
     </ClCompile>
@@ -87,6 +84,12 @@
     </ClCompile>
     <ClCompile Include="TextureManager.cpp">
       <Filter>Исходные файлы\Менеджеры</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene.cpp">
+      <Filter>Исходные файлы\Сцена</Filter>
+    </ClCompile>
+    <ClCompile Include="SkyBox.cpp">
+      <Filter>Исходные файлы\Сцена</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -113,21 +116,6 @@
     </ClInclude>
     <ClInclude Include="imgui\imgui_impl_dx11.h">
       <Filter>Файлы заголовков\imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="Scene.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="Node.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="Mesh.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="Material.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="Buffers.h">
-      <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="tinygltf\json.hpp">
       <Filter>Файлы заголовков\tinygltf</Filter>
@@ -183,9 +171,6 @@
     <ClInclude Include="Camera.hpp">
       <Filter>Файлы заголовков\Отрисовщик</Filter>
     </ClInclude>
-    <ClInclude Include="SkyBox.h">
-      <Filter>Файлы заголовков\Отрисовщик</Filter>
-    </ClInclude>
     <ClInclude Include="CubemapGenerator.h">
       <Filter>Файлы заголовков\Отрисовщик</Filter>
     </ClInclude>
@@ -197,6 +182,12 @@
     </ClInclude>
     <ClInclude Include="Renderer.h">
       <Filter>Файлы заголовков\Отрисовщик</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene.h">
+      <Filter>Файлы заголовков\Сцена</Filter>
+    </ClInclude>
+    <ClInclude Include="SkyBox.h">
+      <Filter>Файлы заголовков\Сцена</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

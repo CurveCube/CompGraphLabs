@@ -8,15 +8,21 @@
 
 class Texture {
 public:
-    Texture(ID3D11Texture2D* texture, ID3D11ShaderResourceView* SRV) :
-        texture_(texture, utilities::DXPtrDeleter<ID3D11Texture2D*>), SRV_(SRV, utilities::DXPtrDeleter<ID3D11ShaderResourceView*>) {};
+    Texture(ID3D11Texture2D* texture, ID3D11ShaderResourceView* SRV, ID3D11ShaderResourceView* SRVSRGB) :
+        texture_(texture, utilities::DXPtrDeleter<ID3D11Texture2D*>), SRV_(SRV, utilities::DXPtrDeleter<ID3D11ShaderResourceView*>),
+        SRVSRGB_(SRVSRGB, utilities::DXPtrDeleter<ID3D11ShaderResourceView*>) {};
 
     std::shared_ptr<ID3D11Texture2D> GetTexture() const {
         return texture_;
     };
 
-    std::shared_ptr<ID3D11ShaderResourceView> GetSRV() const {
-        return SRV_;
+    std::shared_ptr<ID3D11ShaderResourceView> GetSRV(bool isSRGB = false) const {
+        if (isSRGB) {
+            return SRVSRGB_;
+        }
+        else {
+            return SRV_;
+        }
     };
 
     HRESULT SetAnnotationText(const std::string& annotationText = "") {
@@ -32,8 +38,9 @@ public:
     ~Texture() = default;
 
 private:
-    std::shared_ptr<ID3D11Texture2D> texture_;  // transmitted outward ->
-    std::shared_ptr<ID3D11ShaderResourceView> SRV_;  // transmitted outward ->
+    std::shared_ptr<ID3D11Texture2D> texture_; // transmitted outward ->
+    std::shared_ptr<ID3D11ShaderResourceView> SRV_; // transmitted outward ->
+    std::shared_ptr<ID3D11ShaderResourceView> SRVSRGB_; // transmitted outward ->
 };
 
 
@@ -45,11 +52,11 @@ public:
         return textures_.find(name) != textures_.end();
     };
 
-    HRESULT LoadTexture(std::shared_ptr<Texture>& texture, const std::string& name, bool isSRGB = false);
+    HRESULT LoadTexture(std::shared_ptr<Texture>& texture, const std::string& name);
 
-    HRESULT LoadTexture(const std::string& name, bool isSRGB = false) {
+    HRESULT LoadTexture(const std::string& name) {
         std::shared_ptr<Texture> texture;
-        return LoadTexture(texture, name, isSRGB);
+        return LoadTexture(texture, name);
     };
 
     HRESULT LoadHDRTexture(std::shared_ptr<Texture>& texture, const std::string& name);

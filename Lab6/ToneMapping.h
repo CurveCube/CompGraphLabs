@@ -22,7 +22,7 @@ class ToneMapping {
     };
 
 public:
-    ToneMapping() = default;
+    ToneMapping();
 
     HRESULT Init(const std::shared_ptr<Device>& device, const std::shared_ptr<ManagerStorage>& managerStorage,
         int textureWidth, int textureHeight);
@@ -32,7 +32,7 @@ public:
     void Cleanup();
 
     bool IsInit() const {
-        return !!device_;
+        return !!tonemapPS_;
     };
 
     std::shared_ptr<ID3D11RenderTargetView> GetRenderTarget() const {
@@ -61,6 +61,8 @@ private:
     HRESULT CreateTexture(RawPtrTexture& texture, int textureWidth, int textureHeight, DXGI_FORMAT format);
     HRESULT CreateTexture2D(ID3D11Texture2D** texture, int textureWidth, int textureHeight, DXGI_FORMAT format, bool CPUAccess = false);
     void CleanupTextures();
+
+    D3D11_VIEWPORT viewport_;
 
     std::shared_ptr<Device> device_; // provided externally <-
     std::shared_ptr<ManagerStorage> managerStorage_; // provided externally <-

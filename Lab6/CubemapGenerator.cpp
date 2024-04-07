@@ -40,6 +40,34 @@ CubemapGenerator::CubemapGenerator(const std::shared_ptr<Device>& device, const 
     };
 
     prefilteredRoughness_ = { 0.0f, 0.25f, 0.5f, 0.75f, 1.0f };
+
+    environmentMapViewport_.TopLeftX = 0;
+    environmentMapViewport_.TopLeftY = 0;
+    environmentMapViewport_.Width = sideSize;
+    environmentMapViewport_.Height = sideSize;
+    environmentMapViewport_.MinDepth = 0.0f;
+    environmentMapViewport_.MaxDepth = 1.0f;
+
+    irradianceMapViewport_.TopLeftX = 0;
+    irradianceMapViewport_.TopLeftY = 0;
+    irradianceMapViewport_.Width = irradianceSideSize;
+    irradianceMapViewport_.Height = irradianceSideSize;
+    irradianceMapViewport_.MinDepth = 0.0f;
+    irradianceMapViewport_.MaxDepth = 1.0f;
+
+    prefilteredColotViewport_.TopLeftX = 0;
+    prefilteredColotViewport_.TopLeftY = 0;
+    prefilteredColotViewport_.Width = prefilteredSideSize;
+    prefilteredColotViewport_.Height = prefilteredSideSize;
+    prefilteredColotViewport_.MinDepth = 0.0f;
+    prefilteredColotViewport_.MaxDepth = 1.0f;
+
+    BRDFViewport_.TopLeftX = 0;
+    BRDFViewport_.TopLeftY = 0;
+    BRDFViewport_.Width = BRDFSideSize;
+    BRDFViewport_.Height = BRDFSideSize;
+    BRDFViewport_.MinDepth = 0.0f;
+    BRDFViewport_.MaxDepth = 1.0f;
 }
 
 HRESULT CubemapGenerator::Init() {
@@ -159,7 +187,7 @@ HRESULT CubemapGenerator::CreateSide(const std::vector<Vertex>& vertices, const 
     data.SysMemPitch = sizeof(Vertex) * vertices.size();
     data.SysMemSlicePitch = 0;
 
-    HRESULT result = device_->GetDevice()->CreateBuffer(&desc, &data, &side.vertexBuffer_);
+    HRESULT result = device_->GetDevice()->CreateBuffer(&desc, &data, &side.vertexBuffer);
 
     if (SUCCEEDED(result)) {
         D3D11_BUFFER_DESC desc = {};
@@ -175,7 +203,7 @@ HRESULT CubemapGenerator::CreateSide(const std::vector<Vertex>& vertices, const 
         data.SysMemPitch = sizeof(UINT) * indices.size();
         data.SysMemSlicePitch = 0;
 
-        result = device_->GetDevice()->CreateBuffer(&desc, &data, &side.indexBuffer_);
+        result = device_->GetDevice()->CreateBuffer(&desc, &data, &side.indexBuffer);
     }
 
     sides_.push_back(side);
@@ -357,8 +385,8 @@ void CubemapGenerator::Cleanup() {
     samplerAvg_.reset();
 
     for (auto& side : sides_) {
-        SAFE_RELEASE(side.indexBuffer_);
-        SAFE_RELEASE(side.vertexBuffer_);
+        SAFE_RELEASE(side.indexBuffer);
+        SAFE_RELEASE(side.vertexBuffer);
     }
     SAFE_RELEASE(viewMatrixBuffer_);
     SAFE_RELEASE(roughnessBuffer_);
@@ -399,15 +427,7 @@ HRESULT CubemapGenerator::RenderBRDF() {
         return result;
     }
 
-    D3D11_VIEWPORT viewport;
-    viewport.TopLeftX = 0;
-    viewport.TopLeftY = 0;
-    viewport.Width = prefilteredSideSize;
-    viewport.Height = prefilteredSideSize;
-    viewport.MinDepth = 0.0f;
-    viewport.MaxDepth = 1.0f;
-    device_->GetDeviceContext()->RSSetViewports(1, &viewport);
-
+    device_->GetDeviceContext()->RSSetViewports(1, &BRDFViewport_);
     device_->GetDeviceContext()->OMSetDepthStencilState(nullptr, 0);
     device_->GetDeviceContext()->RSSetState(rasterizerState_.get());
     device_->GetDeviceContext()->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
@@ -484,25 +504,18 @@ HRESULT CubemapGenerator::RenderEnvironmentMapSide(Sides side) {
         return result;
     }
 
-    D3D11_VIEWPORT viewport;
-    viewport.TopLeftX = 0;
-    viewport.TopLeftY = 0;
-    viewport.Width = sideSize;
-    viewport.Height = sideSize;
-    viewport.MinDepth = 0.0f;
-    viewport.MaxDepth = 1.0f;
-    device_->GetDeviceContext()->RSSetViewports(1, &viewport);
+    device_->GetDeviceContext()->RSSetViewports(1, &environmentMapViewport_);
 
     ViewMatrixBuffer viewMatrix;
     viewMatrix.viewProjectionMatrix = XMMatrixMultiply(viewMatrices_[side], projectionMatrix_);
     device_->GetDeviceContext()->UpdateSubresource(viewMatrixBuffer_, 0, nullptr, &viewMatrix, 0, 0);
 
     device_->GetDeviceContext()->IASetInputLayout(vs->GetInputLayout().get());
-    ID3D11Buffer* vertexBuffers[] = { sides_[side].vertexBuffer_ };
+    ID3D11Buffer* vertexBuffers[] = { sides_[side].vertexBuffer };
     UINT strides[] = { sizeof(Vertex) };
     UINT offsets[] = { 0 };
     device_->GetDeviceContext()->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
-    device_->GetDeviceContext()->IASetIndexBuffer(sides_[side].indexBuffer_, DXGI_FORMAT_R32_UINT, 0);
+    device_->GetDeviceContext()->IASetIndexBuffer(sides_[side].indexBuffer, DXGI_FORMAT_R32_UINT, 0);
     device_->GetDeviceContext()->OMSetDepthStencilState(nullptr, 0);
     device_->GetDeviceContext()->RSSetState(rasterizerState_.get());
     device_->GetDeviceContext()->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
@@ -535,25 +548,18 @@ HRESULT CubemapGenerator::RenderIrradianceMapSide(Sides side) {
         return result;
     }
 
-    D3D11_VIEWPORT viewport;
-    viewport.TopLeftX = 0;
-    viewport.TopLeftY = 0;
-    viewport.Width = irradianceSideSize;
-    viewport.Height = irradianceSideSize;
-    viewport.MinDepth = 0.0f;
-    viewport.MaxDepth = 1.0f;
-    device_->GetDeviceContext()->RSSetViewports(1, &viewport);
+    device_->GetDeviceContext()->RSSetViewports(1, &irradianceMapViewport_);
 
     ViewMatrixBuffer viewMatrix;
     viewMatrix.viewProjectionMatrix = XMMatrixMultiply(viewMatrices_[side], projectionMatrix_);
     device_->GetDeviceContext()->UpdateSubresource(viewMatrixBuffer_, 0, nullptr, &viewMatrix, 0, 0);
 
     device_->GetDeviceContext()->IASetInputLayout(vs->GetInputLayout().get());
-    ID3D11Buffer* vertexBuffers[] = { sides_[side].vertexBuffer_ };
+    ID3D11Buffer* vertexBuffers[] = { sides_[side].vertexBuffer };
     UINT strides[] = { sizeof(Vertex) };
     UINT offsets[] = { 0 };
     device_->GetDeviceContext()->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
-    device_->GetDeviceContext()->IASetIndexBuffer(sides_[side].indexBuffer_, DXGI_FORMAT_R32_UINT, 0);
+    device_->GetDeviceContext()->IASetIndexBuffer(sides_[side].indexBuffer, DXGI_FORMAT_R32_UINT, 0);
     device_->GetDeviceContext()->OMSetDepthStencilState(nullptr, 0);
     device_->GetDeviceContext()->RSSetState(rasterizerState_.get());
     device_->GetDeviceContext()->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
@@ -586,14 +592,9 @@ HRESULT CubemapGenerator::RenderPrefilteredMap(Sides side, int mipSlice, int mip
         return result;
     }
 
-    D3D11_VIEWPORT viewport;
-    viewport.TopLeftX = 0;
-    viewport.TopLeftY = 0;
-    viewport.Width = mipMapSize;
-    viewport.Height = mipMapSize;
-    viewport.MinDepth = 0.0f;
-    viewport.MaxDepth = 1.0f;
-    device_->GetDeviceContext()->RSSetViewports(1, &viewport);
+    prefilteredColotViewport_.Width = mipMapSize;
+    prefilteredColotViewport_.Height = mipMapSize;
+    device_->GetDeviceContext()->RSSetViewports(1, &prefilteredColotViewport_);
 
     ViewMatrixBuffer viewMatrix;
     viewMatrix.viewProjectionMatrix = XMMatrixMultiply(viewMatrices_[side], projectionMatrix_);
@@ -604,11 +605,11 @@ HRESULT CubemapGenerator::RenderPrefilteredMap(Sides side, int mipSlice, int mip
     device_->GetDeviceContext()->UpdateSubresource(roughnessBuffer_, 0, nullptr, &roughnessBuffer, 0, 0);
 
     device_->GetDeviceContext()->IASetInputLayout(vs->GetInputLayout().get());
-    ID3D11Buffer* vertexBuffers[] = { sides_[side].vertexBuffer_ };
+    ID3D11Buffer* vertexBuffers[] = { sides_[side].vertexBuffer };
     UINT strides[] = { sizeof(Vertex) };
     UINT offsets[] = { 0 };
     device_->GetDeviceContext()->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
-    device_->GetDeviceContext()->IASetIndexBuffer(sides_[side].indexBuffer_, DXGI_FORMAT_R32_UINT, 0);
+    device_->GetDeviceContext()->IASetIndexBuffer(sides_[side].indexBuffer, DXGI_FORMAT_R32_UINT, 0);
     device_->GetDeviceContext()->OMSetDepthStencilState(nullptr, 0);
     device_->GetDeviceContext()->RSSetState(rasterizerState_.get());
     device_->GetDeviceContext()->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);

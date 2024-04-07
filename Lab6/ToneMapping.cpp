@@ -1,5 +1,14 @@
 ﻿#include "ToneMapping.h"
 
+ToneMapping::ToneMapping() {
+    viewport_.TopLeftX = 0;
+    viewport_.TopLeftY = 0;
+    viewport_.Width = 1.0f;
+    viewport_.Height = 1.0f;
+    viewport_.MinDepth = 0.0f;
+    viewport_.MaxDepth = 1.0f;
+}
+
 void ToneMapping::Cleanup() {
     CleanupTextures();
 
@@ -70,16 +79,7 @@ HRESULT ToneMapping::Init(const std::shared_ptr<Device>& device, const std::shar
         desc.CPUAccessFlags = 0;
         desc.MiscFlags = 0;
         desc.StructureByteStride = 0;
-
-        AdaptBuffer adaptBuffer;
-        adaptBuffer.adapt = XMFLOAT4(0.0f, s, 0.0f, 0.0f);
-
-        D3D11_SUBRESOURCE_DATA data;
-        data.pSysMem = &adaptBuffer;
-        data.SysMemPitch = sizeof(adaptBuffer);
-        data.SysMemSlicePitch = 0;
-
-        result = device_->GetDevice()->CreateBuffer(&desc, &data, &adaptBuffer_);
+        result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &adaptBuffer_);
     }
 
     if (SUCCEEDED(result)) {
@@ -203,14 +203,9 @@ bool ToneMapping::CalculateBrightness() {
             samplerMax_.get() };
         device_->GetDeviceContext()->PSSetSamplers(0, 3, samplers);
 
-        D3D11_VIEWPORT viewport;
-        viewport.TopLeftX = 0;
-        viewport.TopLeftY = 0;
-        viewport.Width = (FLOAT)pow(2, i);
-        viewport.Height = (FLOAT)pow(2, i);
-        viewport.MinDepth = 0.0f;
-        viewport.MaxDepth = 1.0f;
-        device_->GetDeviceContext()->RSSetViewports(1, &viewport);
+        viewport_.Width = pow(2, i);
+        viewport_.Height = pow(2, i);
+        device_->GetDeviceContext()->RSSetViewports(1, &viewport_);
 
         ID3D11ShaderResourceView* resources[] = {
             i == n ? frameSRV_ : scaledFrames_[i + 1].avg.SRV,

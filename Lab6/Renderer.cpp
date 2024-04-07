@@ -5,6 +5,27 @@ Renderer& Renderer::GetInstance() {
     return instance;
 }
 
+Renderer::Renderer() : width_(defaultWidth), height_(defaultHeight) {
+    for (UINT i = 0; i < CSM_SPLIT_COUNT; ++i) {
+        shadowBuffers_[i] = nullptr;
+        shadowViews_[i] = nullptr;
+    }
+
+    shadowMapViewport_.TopLeftX = 0;
+    shadowMapViewport_.TopLeftY = 0;
+    shadowMapViewport_.Width = shadowMapSize;
+    shadowMapViewport_.Height = shadowMapSize;
+    shadowMapViewport_.MinDepth = 0.0f;
+    shadowMapViewport_.MaxDepth = 1.0f;
+
+    viewport_.TopLeftX = 0;
+    viewport_.TopLeftY = 0;
+    viewport_.Width = width_;
+    viewport_.Height = height_;
+    viewport_.MinDepth = 0.0f;
+    viewport_.MaxDepth = 1.0f;
+}
+
 bool Renderer::Init(HINSTANCE hInstance, HWND hWnd) {
     IDXGIFactory* factory = nullptr;
     IDXGIAdapter* adapter = nullptr;
@@ -56,23 +77,7 @@ bool Renderer::Init(HINSTANCE hInstance, HWND hWnd) {
         result = toneMapping_.Init(device_, managerStorage_, width_, height_);
     }
     if (SUCCEEDED(result)) {
-        D3D11_TEXTURE2D_DESC desc = {};
-        desc.Format = DXGI_FORMAT_D32_FLOAT;
-        desc.ArraySize = 1;
-        desc.MipLevels = 1;
-        desc.Usage = D3D11_USAGE_DEFAULT;
-        desc.Height = height_;
-        desc.Width = width_;
-        desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-        desc.CPUAccessFlags = 0;
-        desc.MiscFlags = 0;
-        desc.SampleDesc.Count = 1;
-        desc.SampleDesc.Quality = 0;
-
-        result = device_->GetDevice()->CreateTexture2D(&desc, nullptr, &depthBuffer_);
-    }
-    if (SUCCEEDED(result)) {
-        result = device_->GetDevice()->CreateDepthStencilView(depthBuffer_, nullptr, &depthStencilView_);
+        result = CreateDepthStencilViews();
     }
     if (SUCCEEDED(result)) {
         result = InitImgui(hWnd);
@@ -106,6 +111,48 @@ HRESULT Renderer::GenerateTextures() {
     if (SUCCEEDED(result)) {
         result = cubeMapGen.GenerateBRDF(BRDF_);
     }
+    return result;
+}
+
+HRESULT Renderer::CreateDepthStencilViews() {
+    D3D11_TEXTURE2D_DESC desc = {};
+    desc.Format = DXGI_FORMAT_D32_FLOAT;
+    desc.ArraySize = 1;
+    desc.MipLevels = 1;
+    desc.Usage = D3D11_USAGE_DEFAULT;
+    desc.Height = height_;
+    desc.Width = width_;
+    desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+    desc.CPUAccessFlags = 0;
+    desc.MiscFlags = 0;
+    desc.SampleDesc.Count = 1;
+    desc.SampleDesc.Quality = 0;
+
+    HRESULT result = device_->GetDevice()->CreateTexture2D(&desc, nullptr, &depthBuffer_);
+    if (SUCCEEDED(result)) {
+        result = device_->GetDevice()->CreateDepthStencilView(depthBuffer_, nullptr, &depthStencilView_);
+    }
+
+    for (UINT i = 0; i < CSM_SPLIT_COUNT && SUCCEEDED(result); ++i) {
+        D3D11_TEXTURE2D_DESC desc = {};
+        desc.Format = DXGI_FORMAT_D32_FLOAT;
+        desc.ArraySize = 1;
+        desc.MipLevels = 1;
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.Height = shadowMapSize;
+        desc.Width = shadowMapSize;
+        desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+
+        result = device_->GetDevice()->CreateTexture2D(&desc, nullptr, &shadowBuffers_[i]);
+        if (SUCCEEDED(result)) {
+            result = device_->GetDevice()->CreateDepthStencilView(shadowBuffers_[i], nullptr, &shadowViews_[i]);
+        }
+    }
+
     return result;
 }
 
@@ -245,17 +292,8 @@ bool Renderer::Render() {
 #endif
 
     UpdateImgui();
-
     device_->GetDeviceContext()->ClearState();
-
-    D3D11_VIEWPORT viewport;
-    viewport.TopLeftX = 0;
-    viewport.TopLeftY = 0;
-    viewport.Width = (FLOAT)width_;
-    viewport.Height = (FLOAT)height_;
-    viewport.MinDepth = 0.0f;
-    viewport.MaxDepth = 1.0f;
-    device_->GetDeviceContext()->RSSetViewports(1, &viewport);
+    device_->GetDeviceContext()->RSSetViewports(1, &viewport_);
 
     D3D11_RECT rect;
     rect.left = 0;
@@ -305,7 +343,7 @@ bool Renderer::Render() {
 
         ID3D11RenderTargetView* rtv[] = { swapChain_.GetRenderTarget().get() };
         device_->GetDeviceContext()->OMSetRenderTargets(1, rtv, nullptr);
-        device_->GetDeviceContext()->RSSetViewports(1, &viewport);
+        device_->GetDeviceContext()->RSSetViewports(1, &viewport_);
 
         if (!toneMapping_.RenderTonemap()) {
             return false;
@@ -331,8 +369,11 @@ bool Renderer::Resize(UINT width, UINT height) {
     if (!device_ || !swapChain_.IsInit()) {
         return false;
     }
+
     width_ = max(width, 8);
     height_ = max(height, 8);
+    viewport_.Width = width_;
+    viewport_.Height = height_;
 
     SAFE_RELEASE(depthBuffer_);
     SAFE_RELEASE(depthStencilView_);
@@ -412,6 +453,10 @@ void Renderer::Cleanup() {
 
     SAFE_RELEASE(depthBuffer_);
     SAFE_RELEASE(depthStencilView_);
+    for (UINT i = 0; i < CSM_SPLIT_COUNT; ++i) {
+        SAFE_RELEASE(shadowBuffers_[i]);
+        SAFE_RELEASE(shadowViews_[i]);
+    }
     
 #ifdef _DEBUG
     SAFE_RELEASE(pAnnotation_);

@@ -15,7 +15,6 @@
 #include <tchar.h>
 
 #define SAFE_RELEASE(A) if ((A) != NULL) { (A)->Release(); (A) = NULL; }
-#define MAX_LIGHT 3
 
 #include <d3dcompiler.h>
 #include <dxgi.h>

@@ -4,8 +4,9 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "tinygltf/stb_image.h"
+#undef STB_IMAGE_IMPLEMENTATION
 
-HRESULT TextureManager::LoadTexture(std::shared_ptr<Texture>& texture, const std::string& name, bool isSRGB) {
+HRESULT TextureManager::LoadTexture(std::shared_ptr<Texture>& texture, const std::string& name) {
     if (SUCCEEDED(GetTexture(texture, name))) {
         return S_OK;
     }
@@ -39,17 +40,26 @@ HRESULT TextureManager::LoadTexture(std::shared_ptr<Texture>& texture, const std
 
     ID3D11Texture2D* tex;
     ID3D11ShaderResourceView* SRV;
+    ID3D11ShaderResourceView* SRVSRGB;
     HRESULT result = device_->GetDevice()->CreateTexture2D(&textureDesc, &initData, &tex);
     if (SUCCEEDED(result)) {
         D3D11_SHADER_RESOURCE_VIEW_DESC desc = {};
-        desc.Format = isSRGB ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
         desc.Texture2D.MipLevels = 1;
         desc.Texture2D.MostDetailedMip = 0;
         result = device_->GetDevice()->CreateShaderResourceView(tex, &desc, &SRV);
     }
     if (SUCCEEDED(result)) {
-        texture = std::make_shared<Texture>(tex, SRV);
+        D3D11_SHADER_RESOURCE_VIEW_DESC desc = {};
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+        desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+        desc.Texture2D.MipLevels = 1;
+        desc.Texture2D.MostDetailedMip = 0;
+        result = device_->GetDevice()->CreateShaderResourceView(tex, &desc, &SRVSRGB);
+    }
+    if (SUCCEEDED(result)) {
+        texture = std::make_shared<Texture>(tex, SRV, SRVSRGB);
         textures_.emplace(name, texture);
     }
 

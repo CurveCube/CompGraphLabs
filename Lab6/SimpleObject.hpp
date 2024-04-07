@@ -17,7 +17,7 @@ class SimpleObject {
         XMMATRIX viewProjectionMatrix;
         XMFLOAT4 cameraPos;
         XMINT4 lightParams;
-        Light lights[MAX_LIGHT];
+        SpotLight lights[MAX_LIGHT];
     };
 
     struct Vertex {
@@ -39,7 +39,8 @@ public:
 
     SimpleObject() : worldMatrix_(XMMatrixIdentity()), color_(XMFLOAT3(1.0f, 0.71f, 0.29f)) {};
 
-    HRESULT Init(const std::shared_ptr<Device>& device, const std::shared_ptr<ManagerStorage>& managerStorage, const std::shared_ptr<Camera>& camera) {
+    HRESULT Init(const std::shared_ptr<Device>& device, const std::shared_ptr<ManagerStorage>& managerStorage,
+        const std::shared_ptr<Camera>& camera) {
         if (!managerStorage->IsInit() || !device->IsInit()) {
             return E_FAIL;
         }
@@ -60,19 +61,7 @@ public:
             desc.CPUAccessFlags = 0;
             desc.MiscFlags = 0;
             desc.StructureByteStride = 0;
-
-            WorldMatrixBuffer worldMatrixBuffer;
-            worldMatrixBuffer.worldMatrix = worldMatrix_;
-            worldMatrixBuffer.color = color_;
-            worldMatrixBuffer.roughness = roughness_;
-            worldMatrixBuffer.metalness = metalness_;
-
-            D3D11_SUBRESOURCE_DATA data;
-            data.pSysMem = &worldMatrixBuffer;
-            data.SysMemPitch = sizeof(worldMatrixBuffer);
-            data.SysMemSlicePitch = 0;
-
-            result = device_->GetDevice()->CreateBuffer(&desc, &data, &worldMatrixBuffer_);
+            result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &worldMatrixBuffer_);
         }
         if (SUCCEEDED(result)) {
             D3D11_BUFFER_DESC desc = {};
@@ -103,7 +92,7 @@ public:
     };
 
     bool Render(const std::shared_ptr<ID3D11ShaderResourceView>& irradianceMap, const std::shared_ptr<ID3D11ShaderResourceView>& prefilteredMap,
-        const std::shared_ptr<ID3D11ShaderResourceView>& BRDF, const std::vector<Light>& lights) {
+        const std::shared_ptr<ID3D11ShaderResourceView>& BRDF, const std::vector<SpotLight>& lights) {
         if (!IsInit()) {
             return false;
         }
@@ -198,7 +187,7 @@ public:
     };
 
     bool IsInit() const {
-        return !!vertexBuffer_;
+        return !!samplerAvg_;
     };
 
     ~SimpleObject() {

@@ -7,6 +7,7 @@ class CubemapGenerator {
     static const UINT sideSize = 512;
     static const UINT irradianceSideSize = 32;
     static const UINT prefilteredSideSize = 128;
+    static const UINT BRDFSideSize = 128;
 
     enum Sides {
         XPLUS,
@@ -30,9 +31,9 @@ class CubemapGenerator {
     };
 
     struct Side {
-        ID3D11Buffer* vertexBuffer_ = nullptr;
-        ID3D11Buffer* indexBuffer_ = nullptr;
-        UINT numIndices_ = 6;
+        ID3D11Buffer* vertexBuffer = nullptr;
+        ID3D11Buffer* indexBuffer = nullptr;
+        UINT numIndices = 6;
     };
 
 public:
@@ -46,7 +47,7 @@ public:
     void Cleanup();
 
     bool IsInit() {
-        return !!viewMatrixBuffer_;
+        return !!samplerAvg_;
     };
 
     ~CubemapGenerator() {
@@ -68,6 +69,10 @@ private:
     void CleanupSubResources();
 
     static const std::vector<D3D11_INPUT_ELEMENT_DESC> VertexDesc;
+    D3D11_VIEWPORT environmentMapViewport_;
+    D3D11_VIEWPORT irradianceMapViewport_;
+    D3D11_VIEWPORT prefilteredColotViewport_;
+    D3D11_VIEWPORT BRDFViewport_;
 
     std::shared_ptr<Device> device_; // provided externally <-
     std::shared_ptr<ManagerStorage> managerStorage_; // provided externally <-

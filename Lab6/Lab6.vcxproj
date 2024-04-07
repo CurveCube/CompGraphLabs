@@ -29,12 +29,12 @@
     <ClCompile Include="imgui\imgui_widgets.cpp" />
     <ClCompile Include="Lab6.cpp" />
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SkyBox.cpp" />
     <ClCompile Include="TextureManager.cpp" />
     <ClCompile Include="ToneMapping.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Buffers.h" />
     <ClInclude Include="Camera.hpp" />
     <ClInclude Include="CubemapGenerator.h" />
     <ClInclude Include="D3DInclude.hpp" />
@@ -51,9 +51,6 @@
     <ClInclude Include="Lab6.h" />
     <ClInclude Include="Light.h" />
     <ClInclude Include="ManagerStorage.hpp" />
-    <ClInclude Include="Material.h" />
-    <ClInclude Include="Mesh.h" />
-    <ClInclude Include="Node.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Scene.h" />

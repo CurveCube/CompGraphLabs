@@ -56,7 +56,7 @@ public:
     };
 
     bool IsInit() const {
-        return !!swapChain_;
+        return !!renderTarget_;
     };
 
     std::shared_ptr<ID3D11RenderTargetView> GetRenderTarget() const {

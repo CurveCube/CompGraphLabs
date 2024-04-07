@@ -30,17 +30,7 @@ HRESULT Skybox::Init(const std::shared_ptr<Device>& device, const std::shared_pt
         desc.CPUAccessFlags = 0;
         desc.MiscFlags = 0;
         desc.StructureByteStride = 0;
-
-        WorldMatrixBuffer worldMatrixBuffer;
-        worldMatrixBuffer.worldMatrix = worldMatrix_;
-        worldMatrixBuffer.size = XMFLOAT4(size_, 0.0f, 0.0f, 0.0f);
-
-        D3D11_SUBRESOURCE_DATA data;
-        data.pSysMem = &worldMatrixBuffer;
-        data.SysMemPitch = sizeof(worldMatrixBuffer);
-        data.SysMemSlicePitch = 0;
-
-        result = device_->GetDevice()->CreateBuffer(&desc, &data, &worldMatrixBuffer_);
+        result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &worldMatrixBuffer_);
     }
     if (SUCCEEDED(result)) {
         D3D11_BUFFER_DESC desc = {};
@@ -50,18 +40,7 @@ HRESULT Skybox::Init(const std::shared_ptr<Device>& device, const std::shared_pt
         desc.CPUAccessFlags = 0;
         desc.MiscFlags = 0;
         desc.StructureByteStride = 0;
-
-        ViewMatrixBuffer viewMatrixBuffer;
-        XMFLOAT3 pos = camera_->GetPosition();
-        viewMatrixBuffer.viewProjectionMatrix = camera_->GetViewProjectionMatrix();
-        viewMatrixBuffer.cameraPos = XMFLOAT4(pos.x, pos.y, pos.z, 1.0f);
-
-        D3D11_SUBRESOURCE_DATA data;
-        data.pSysMem = &viewMatrixBuffer;
-        data.SysMemPitch = sizeof(viewMatrixBuffer);
-        data.SysMemSlicePitch = 0;
-
-        result = device_->GetDevice()->CreateBuffer(&desc, &data, &viewMatrixBuffer_);
+        result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &viewMatrixBuffer_);
     }
     if (SUCCEEDED(result)) {
         result = managerStorage_->GetStateManager()->CreateDepthStencilState(dsState_, D3D11_COMPARISON_GREATER_EQUAL, D3D11_DEPTH_WRITE_MASK_ZERO);
@@ -90,7 +69,7 @@ bool Skybox::Resize(UINT width, UINT height) {
     return true;
 }
 
-bool Skybox::Render() {
+bool Skybox::Render() const {
     if (!IsInit()) {
         return false;
     }

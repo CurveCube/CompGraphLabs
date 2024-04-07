@@ -25,7 +25,7 @@ public:
     HRESULT Init(const std::shared_ptr<Device>& device, const std::shared_ptr<ManagerStorage>& managerStorage, const std::shared_ptr<Camera>& camera,
         const std::shared_ptr<ID3D11ShaderResourceView>& cubemapTexture);
     bool Resize(UINT width, UINT height);
-    bool Render();
+    bool Render() const;
     void Cleanup();
 
     void SetCubeMapTexture(const std::shared_ptr<ID3D11ShaderResourceView>& cubemapTexture) {
