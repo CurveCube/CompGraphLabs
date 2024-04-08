@@ -5,27 +5,6 @@ Renderer& Renderer::GetInstance() {
     return instance;
 }
 
-Renderer::Renderer() : width_(defaultWidth), height_(defaultHeight) {
-    for (UINT i = 0; i < CSM_SPLIT_COUNT; ++i) {
-        shadowBuffers_[i] = nullptr;
-        shadowViews_[i] = nullptr;
-    }
-
-    shadowMapViewport_.TopLeftX = 0;
-    shadowMapViewport_.TopLeftY = 0;
-    shadowMapViewport_.Width = shadowMapSize;
-    shadowMapViewport_.Height = shadowMapSize;
-    shadowMapViewport_.MinDepth = 0.0f;
-    shadowMapViewport_.MaxDepth = 1.0f;
-
-    viewport_.TopLeftX = 0;
-    viewport_.TopLeftY = 0;
-    viewport_.Width = width_;
-    viewport_.Height = height_;
-    viewport_.MinDepth = 0.0f;
-    viewport_.MaxDepth = 1.0f;
-}
-
 bool Renderer::Init(HINSTANCE hInstance, HWND hWnd) {
     IDXGIFactory* factory = nullptr;
     IDXGIAdapter* adapter = nullptr;
@@ -68,7 +47,19 @@ bool Renderer::Init(HINSTANCE hInstance, HWND hWnd) {
             height_, 0.01f, 100.0f));
     }
     if (SUCCEEDED(result)) {
-        result = skybox_.Init(device_, managerStorage_, camera_, environmentMap_);
+        skybox_ = std::shared_ptr<Skybox>(new Skybox());
+        result = skybox_->Init(device_, managerStorage_, camera_, environmentMap_);
+    }
+    if (SUCCEEDED(result)) {
+        result = sceneManager_.Init(device_, managerStorage_, camera_);
+    }
+    if (SUCCEEDED(result)) {
+        UINT index = 0;
+        UINT count = 0;
+        result = sceneManager_.LoadScene("models/scene/untitled.gltf", index, count);
+        if (SUCCEEDED(result) && (index != 0 || count != 1)) {
+            result = E_FAIL;
+        }
     }
     if (SUCCEEDED(result)) {
         result = sphere_.Init(device_, managerStorage_, camera_);
@@ -77,7 +68,23 @@ bool Renderer::Init(HINSTANCE hInstance, HWND hWnd) {
         result = toneMapping_.Init(device_, managerStorage_, width_, height_);
     }
     if (SUCCEEDED(result)) {
-        result = CreateDepthStencilViews();
+        D3D11_TEXTURE2D_DESC desc = {};
+        desc.Format = DXGI_FORMAT_D32_FLOAT;
+        desc.ArraySize = 1;
+        desc.MipLevels = 1;
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.Height = height_;
+        desc.Width = width_;
+        desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+
+        result = device_->GetDevice()->CreateTexture2D(&desc, nullptr, &depthBuffer_);
+    }
+    if (SUCCEEDED(result)) {
+        result = device_->GetDevice()->CreateDepthStencilView(depthBuffer_, nullptr, &depthStencilView_);
     }
     if (SUCCEEDED(result)) {
         result = InitImgui(hWnd);
@@ -111,48 +118,6 @@ HRESULT Renderer::GenerateTextures() {
     if (SUCCEEDED(result)) {
         result = cubeMapGen.GenerateBRDF(BRDF_);
     }
-    return result;
-}
-
-HRESULT Renderer::CreateDepthStencilViews() {
-    D3D11_TEXTURE2D_DESC desc = {};
-    desc.Format = DXGI_FORMAT_D32_FLOAT;
-    desc.ArraySize = 1;
-    desc.MipLevels = 1;
-    desc.Usage = D3D11_USAGE_DEFAULT;
-    desc.Height = height_;
-    desc.Width = width_;
-    desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-    desc.CPUAccessFlags = 0;
-    desc.MiscFlags = 0;
-    desc.SampleDesc.Count = 1;
-    desc.SampleDesc.Quality = 0;
-
-    HRESULT result = device_->GetDevice()->CreateTexture2D(&desc, nullptr, &depthBuffer_);
-    if (SUCCEEDED(result)) {
-        result = device_->GetDevice()->CreateDepthStencilView(depthBuffer_, nullptr, &depthStencilView_);
-    }
-
-    for (UINT i = 0; i < CSM_SPLIT_COUNT && SUCCEEDED(result); ++i) {
-        D3D11_TEXTURE2D_DESC desc = {};
-        desc.Format = DXGI_FORMAT_D32_FLOAT;
-        desc.ArraySize = 1;
-        desc.MipLevels = 1;
-        desc.Usage = D3D11_USAGE_DEFAULT;
-        desc.Height = shadowMapSize;
-        desc.Width = shadowMapSize;
-        desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-        desc.CPUAccessFlags = 0;
-        desc.MiscFlags = 0;
-        desc.SampleDesc.Count = 1;
-        desc.SampleDesc.Quality = 0;
-
-        result = device_->GetDevice()->CreateTexture2D(&desc, nullptr, &shadowBuffers_[i]);
-        if (SUCCEEDED(result)) {
-            result = device_->GetDevice()->CreateDepthStencilView(shadowBuffers_[i], nullptr, &shadowViews_[i]);
-        }
-    }
-
     return result;
 }
 
@@ -329,7 +294,7 @@ bool Renderer::Render() {
     pAnnotation_->BeginEvent(L"Draw_skybox");
 #endif
 
-    if (!skybox_.Render()) {
+    if (!skybox_->Render()) {
         return false;
     }
 
@@ -402,7 +367,7 @@ bool Renderer::Resize(UINT width, UINT height) {
     if (!swapChain_.Resize(width_, height_)) {
         return false;
     }
-    if (!skybox_.Resize(width_, height_)) {
+    if (!skybox_->Resize(width_, height_)) {
         return false;
     }
     if (!toneMapping_.Resize(width_, height_)) {
@@ -446,17 +411,13 @@ void Renderer::Cleanup() {
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 
-    skybox_.Cleanup();
     sphere_.Cleanup();
     toneMapping_.Cleanup();
+    sceneManager_.Cleanup();
     swapChain_.Cleanup();
 
     SAFE_RELEASE(depthBuffer_);
     SAFE_RELEASE(depthStencilView_);
-    for (UINT i = 0; i < CSM_SPLIT_COUNT; ++i) {
-        SAFE_RELEASE(shadowBuffers_[i]);
-        SAFE_RELEASE(shadowViews_[i]);
-    }
     
 #ifdef _DEBUG
     SAFE_RELEASE(pAnnotation_);
@@ -466,6 +427,7 @@ void Renderer::Cleanup() {
     selectedAdapter_.reset();
     camera_.reset();
     managerStorage_.reset();
+    skybox_.reset();
     environmentMap_.reset();
     irradianceMap_.reset();
     prefilteredMap_.reset();

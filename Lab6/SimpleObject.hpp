@@ -92,7 +92,7 @@ public:
     };
 
     bool Render(const std::shared_ptr<ID3D11ShaderResourceView>& irradianceMap, const std::shared_ptr<ID3D11ShaderResourceView>& prefilteredMap,
-        const std::shared_ptr<ID3D11ShaderResourceView>& BRDF, const std::vector<SpotLight>& lights) {
+        const std::shared_ptr<ID3D11ShaderResourceView>& BRDF, const std::vector<SpotLight>& lights) const {
         if (!IsInit()) {
             return false;
         }

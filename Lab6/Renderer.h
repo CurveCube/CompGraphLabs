@@ -8,6 +8,7 @@
 #include "CubemapGenerator.h"
 #include "SkyBox.h"
 #include "Light.h"
+#include "Scene.h"
 #include <vector>
 #include <string>
 
@@ -38,15 +39,19 @@ public:
     };
 
 private:
-    Renderer();
+    Renderer() : width_(defaultWidth), height_(defaultHeight) {
+        viewport_.TopLeftX = 0;
+        viewport_.TopLeftY = 0;
+        viewport_.Width = width_;
+        viewport_.Height = height_;
+        viewport_.MinDepth = 0.0f;
+        viewport_.MaxDepth = 1.0f;
+    };
 
     HRESULT InitImgui(HWND hWnd);
-    HRESULT CreateDepthStencilViews();
     HRESULT GenerateTextures();
     void UpdateImgui();
 
-    static const UINT shadowMapSize = 1024;
-    D3D11_VIEWPORT shadowMapViewport_;
     D3D11_VIEWPORT viewport_;
 
     std::shared_ptr<IDXGIFactory> factory_; // transmitted outward ->
@@ -54,6 +59,7 @@ private:
     std::shared_ptr<Device> device_; // transmitted outward ->
     std::shared_ptr<Camera> camera_; // transmitted outward ->
     std::shared_ptr<ManagerStorage> managerStorage_; // transmitted outward ->
+    std::shared_ptr<Skybox> skybox_; // transmitted outward ->
 
     std::shared_ptr<ID3D11ShaderResourceView> environmentMap_; // transmitted outward ->
     std::shared_ptr<ID3D11ShaderResourceView> irradianceMap_; // transmitted outward ->
@@ -62,7 +68,7 @@ private:
 
     SwapChain swapChain_;
     ToneMapping toneMapping_;
-    Skybox skybox_;
+    SceneManager sceneManager_;
     SimpleObject sphere_;
 
     std::vector<SpotLight> lights_;
@@ -72,8 +78,6 @@ private:
 #endif // _DEBUG
     ID3D11Texture2D* depthBuffer_ = nullptr; // always remains only inside the class #
     ID3D11DepthStencilView* depthStencilView_ = nullptr; // always remains only inside the class #
-    ID3D11Texture2D* shadowBuffers_[CSM_SPLIT_COUNT]; // always remains only inside the class #
-    ID3D11DepthStencilView* shadowViews_[CSM_SPLIT_COUNT]; // always remains only inside the class #
 
     bool default_ = true;
     unsigned int width_ = defaultWidth;

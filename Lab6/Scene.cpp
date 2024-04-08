@@ -8,6 +8,21 @@
 
 const float SceneManager::slopeScaleBias_ = 2 * sqrt(2);
 
+SceneManager::SceneManager() {
+    for (UINT i = 0; i < CSM_SPLIT_COUNT; ++i) {
+        shadowBuffers_[i] = nullptr;
+        shadowDSViews_[i] = nullptr;
+        shadowSRViews_[i] = nullptr;
+    }
+
+    shadowMapViewport_.TopLeftX = 0;
+    shadowMapViewport_.TopLeftY = 0;
+    shadowMapViewport_.Width = shadowMapSize;
+    shadowMapViewport_.Height = shadowMapSize;
+    shadowMapViewport_.MinDepth = 0.0f;
+    shadowMapViewport_.MaxDepth = 1.0f;
+}
+
 HRESULT SceneManager::Init(const std::shared_ptr<Device>& device, const std::shared_ptr<ManagerStorage>& managerStorage,
     const std::shared_ptr<Camera>& camera) {
     if (!managerStorage->IsInit() || !device->IsInit()) {
@@ -26,6 +41,10 @@ HRESULT SceneManager::Init(const std::shared_ptr<Device>& device, const std::sha
     desc.MiscFlags = 0;
     desc.StructureByteStride = 0;
     HRESULT result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &worldMatrixBuffer_);
+
+    if (SUCCEEDED(result)) {
+        result = CreateDepthStencilViews();
+    }
 
     if (SUCCEEDED(result)) {
         D3D11_BUFFER_DESC desc = {};
@@ -49,6 +68,43 @@ HRESULT SceneManager::Init(const std::shared_ptr<Device>& device, const std::sha
         result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &materialParamsBuffer_);
     }
 
+    return result;
+}
+
+HRESULT SceneManager::CreateDepthStencilViews() {
+    HRESULT result = S_OK;
+    for (UINT i = 0; i < CSM_SPLIT_COUNT && SUCCEEDED(result); ++i) {
+        D3D11_TEXTURE2D_DESC desc = {};
+        desc.Format = DXGI_FORMAT_R32_TYPELESS;
+        desc.ArraySize = 1;
+        desc.MipLevels = 1;
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.Height = shadowMapSize;
+        desc.Width = shadowMapSize;
+        desc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+
+        result = device_->GetDevice()->CreateTexture2D(&desc, nullptr, &shadowBuffers_[i]);
+        if (SUCCEEDED(result)) {
+            D3D11_DEPTH_STENCIL_VIEW_DESC desc = {};
+            desc.Format = DXGI_FORMAT_D32_FLOAT;
+            desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+            desc.Texture2D.MipSlice = 0;
+            desc.Flags = 0;
+            result = device_->GetDevice()->CreateDepthStencilView(shadowBuffers_[i], &desc, &shadowDSViews_[i]);
+        }
+        if (SUCCEEDED(result)) {
+            D3D11_SHADER_RESOURCE_VIEW_DESC desc = {};
+            desc.Format = DXGI_FORMAT_R32_FLOAT;
+            desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+            desc.Texture2D.MipLevels = 1;
+            desc.Texture2D.MostDetailedMip = 0;
+            result = device_->GetDevice()->CreateShaderResourceView(shadowBuffers_[i], &desc, &shadowSRViews_[i]);
+        }
+    }
     return result;
 }
 
@@ -136,6 +192,7 @@ HRESULT SceneManager::CreateBufferAccessors(const tinygltf::Model& model, SceneA
             break;
         }
         arrays.accessors.push_back(accessor);
+        accessor.reset();
     }
     return result;
 }
@@ -161,7 +218,7 @@ DXGI_FORMAT SceneManager::GetFormat(const tinygltf::Accessor& accessor) {
     return format;
 }
 
-DXGI_FORMAT GetFormatScalar(const tinygltf::Accessor& accessor) {
+DXGI_FORMAT SceneManager::GetFormatScalar(const tinygltf::Accessor& accessor) {
     DXGI_FORMAT format = DXGI_FORMAT_R32_FLOAT;
     switch (accessor.componentType) {
     case TINYGLTF_COMPONENT_TYPE_BYTE:
@@ -208,7 +265,7 @@ DXGI_FORMAT GetFormatScalar(const tinygltf::Accessor& accessor) {
     return format;
 }
 
-DXGI_FORMAT GetFormatVec2(const tinygltf::Accessor& accessor) {
+DXGI_FORMAT SceneManager::GetFormatVec2(const tinygltf::Accessor& accessor) {
     DXGI_FORMAT format = DXGI_FORMAT_R32G32_FLOAT;
     switch (accessor.componentType) {
     case TINYGLTF_COMPONENT_TYPE_BYTE:
@@ -255,7 +312,7 @@ DXGI_FORMAT GetFormatVec2(const tinygltf::Accessor& accessor) {
     return format;
 }
 
-DXGI_FORMAT GetFormatVec3(const tinygltf::Accessor& accessor) {
+DXGI_FORMAT SceneManager::GetFormatVec3(const tinygltf::Accessor& accessor) {
     DXGI_FORMAT format = DXGI_FORMAT_R32G32B32_FLOAT;
     switch (accessor.componentType) {
     case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
@@ -270,7 +327,7 @@ DXGI_FORMAT GetFormatVec3(const tinygltf::Accessor& accessor) {
     return format;
 }
 
-DXGI_FORMAT GetFormatVec4(const tinygltf::Accessor& accessor) {
+DXGI_FORMAT SceneManager::GetFormatVec4(const tinygltf::Accessor& accessor) {
     DXGI_FORMAT format = DXGI_FORMAT_R32G32B32A32_FLOAT;
     switch (accessor.componentType) {
     case TINYGLTF_COMPONENT_TYPE_BYTE:
@@ -708,19 +765,31 @@ HRESULT SceneManager::CreateNodes(const tinygltf::Model& model, SceneArrays& arr
     return result;
 }
 
-bool SceneManager::SetCurrentScene(UINT index) {
-    if (index >= scenes_.size()) {
-        return false;
-    }
-    currentScene_ = index;
+bool SceneManager::CreateShadowMaps(const DirectionalLight& dirLight, const std::vector<int>& sceneIndices) {
     return true;
 }
 
-int SceneManager::GetCurrentScene() const {
-    if (currentScene_ >= scenes_.size()) {
-        return -1;
-    }
-    return currentScene_;
+bool SceneManager::Render(
+    const std::shared_ptr<ID3D11ShaderResourceView>& irradianceMap,
+    const std::shared_ptr<ID3D11ShaderResourceView>& prefilteredMap,
+    const std::shared_ptr<ID3D11ShaderResourceView>& BRDF,
+    const std::shared_ptr<Skybox>& skybox,
+    const std::vector<SpotLight>& lights,
+    const DirectionalLight& dirLight,
+    const std::vector<int>& sceneIndices
+) {
+    return true;
+}
+
+bool SceneManager::RenderTransparent(
+    const std::shared_ptr<ID3D11ShaderResourceView>& irradianceMap,
+    const std::shared_ptr<ID3D11ShaderResourceView>& prefilteredMap,
+    const std::shared_ptr<ID3D11ShaderResourceView>& BRDF,
+    const std::vector<SpotLight>& lights,
+    const DirectionalLight& dirLight,
+    const std::vector<int>& sceneIndices
+) {
+    return true;
 }
 
 void SceneManager::SetMode(Mode mode) {
@@ -739,6 +808,12 @@ void SceneManager::Cleanup() {
     SAFE_RELEASE(worldMatrixBuffer_);
     SAFE_RELEASE(viewMatrixBuffer_);
     SAFE_RELEASE(materialParamsBuffer_);
+
+    for (UINT i = 0; i < CSM_SPLIT_COUNT; ++i) {
+        SAFE_RELEASE(shadowBuffers_[i]);
+        SAFE_RELEASE(shadowDSViews_[i]);
+        SAFE_RELEASE(shadowSRViews_[i]);
+    }
 
     scenes_.clear();
     sceneArrays_.clear();

@@ -23,9 +23,18 @@ class SceneManager {
 
         BufferAccessor() = default;
 
-        ~BufferAccessor() {
-            SAFE_RELEASE(buffer);
+        void reset() {
+            reseted_ = true;
         };
+
+        ~BufferAccessor() {
+            if (!reseted_) {
+                SAFE_RELEASE(buffer);
+            }
+        };
+
+    private:
+        bool reseted_ = false;
     };
 
     struct Attribute {
@@ -145,17 +154,24 @@ public:
         DEFAULT,
         FRESNEL,
         NDF,
-        GEOMETRY,
-        SHADOW_MAP
+        GEOMETRY
     };
 
-    SceneManager() = default;
+    SceneManager();
 
     HRESULT Init(const std::shared_ptr<Device>& device, const std::shared_ptr<ManagerStorage>& managerStorage,
         const std::shared_ptr<Camera>& camera);
     HRESULT LoadScene(const std::string& name, UINT& index, UINT& count, const XMMATRIX& transformation = XMMatrixIdentity());
-    bool SetCurrentScene(UINT index);
-    int GetCurrentScene() const;
+    bool CreateShadowMaps(const DirectionalLight& dirLight, const std::vector<int>& sceneIndices);
+    bool Render(
+        const std::shared_ptr<ID3D11ShaderResourceView>& irradianceMap,
+        const std::shared_ptr<ID3D11ShaderResourceView>& prefilteredMap,
+        const std::shared_ptr<ID3D11ShaderResourceView>& BRDF,
+        const std::shared_ptr<Skybox>& skybox,
+        const std::vector<SpotLight>& lights,
+        const DirectionalLight& dirLight,
+        const std::vector<int>& sceneIndices
+    );
     void SetMode(Mode mode);
     bool IsInit() const;
     void Cleanup();
@@ -165,6 +181,7 @@ public:
     };
 
 private:
+    HRESULT CreateDepthStencilViews();
     HRESULT CreateBufferAccessors(const tinygltf::Model& model, SceneArrays& arrays);
     HRESULT CreateSamplers(const tinygltf::Model& model, SceneArrays& arrays);
     HRESULT CreateTextures(const tinygltf::Model& model, SceneArrays& arrays, const std::string& gltfFileName);
@@ -181,9 +198,19 @@ private:
         std::vector<Attribute>& attributes, std::vector<std::string>& baseDefines, std::vector<D3D11_INPUT_ELEMENT_DESC>& desc);
     HRESULT CreateShaders(Primitive& primitive, const SceneArrays& arrays,
         const std::vector<std::string>& baseDefines, const std::vector<D3D11_INPUT_ELEMENT_DESC>& desc);
+    bool RenderTransparent(
+        const std::shared_ptr<ID3D11ShaderResourceView>& irradianceMap,
+        const std::shared_ptr<ID3D11ShaderResourceView>& prefilteredMap,
+        const std::shared_ptr<ID3D11ShaderResourceView>& BRDF,
+        const std::vector<SpotLight>& lights,
+        const DirectionalLight& dirLight,
+        const std::vector<int>& sceneIndices
+    );
 
     static const int depthBias_ = 16;
     static const float slopeScaleBias_;
+    static const UINT shadowMapSize = 1024;
+    D3D11_VIEWPORT shadowMapViewport_;
 
     std::shared_ptr<Device> device_; // provided externally <-
     std::shared_ptr<ManagerStorage> managerStorage_; // provided externally <-
@@ -193,10 +220,13 @@ private:
     ID3D11Buffer* viewMatrixBuffer_ = nullptr; // always remains only inside the class #
     ID3D11Buffer* materialParamsBuffer_ = nullptr; // always remains only inside the class #
 
+    ID3D11Texture2D* shadowBuffers_[CSM_SPLIT_COUNT]; // always remains only inside the class #
+    ID3D11DepthStencilView* shadowDSViews_[CSM_SPLIT_COUNT]; // always remains only inside the class #
+    ID3D11ShaderResourceView* shadowSRViews_[CSM_SPLIT_COUNT]; // always remains only inside the class #
+
     std::vector<Scene> scenes_;
     std::vector<SceneArrays> sceneArrays_;
 
-    UINT currentScene_ = 0;
     Mode currentMode_ = DEFAULT;
     std::vector<TransparentPrimitive> transparentPrimitives_;
 };

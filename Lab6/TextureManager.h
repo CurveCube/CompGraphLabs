@@ -8,7 +8,7 @@
 
 class Texture {
 public:
-    Texture(ID3D11Texture2D* texture, ID3D11ShaderResourceView* SRV, ID3D11ShaderResourceView* SRVSRGB) :
+    Texture(ID3D11Texture2D* texture, ID3D11ShaderResourceView* SRV, ID3D11ShaderResourceView* SRVSRGB = nullptr) :
         texture_(texture, utilities::DXPtrDeleter<ID3D11Texture2D*>), SRV_(SRV, utilities::DXPtrDeleter<ID3D11ShaderResourceView*>),
         SRVSRGB_(SRVSRGB, utilities::DXPtrDeleter<ID3D11ShaderResourceView*>) {};
 
