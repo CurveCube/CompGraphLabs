@@ -174,7 +174,7 @@
     <ClInclude Include="CubemapGenerator.h">
       <Filter>Файлы заголовков\Отрисовщик</Filter>
     </ClInclude>
-    <ClInclude Include="Light.h">
+    <ClInclude Include="Light.hpp">
       <Filter>Файлы заголовков\Сцена</Filter>
     </ClInclude>
     <ClInclude Include="SimpleObject.hpp">
@@ -207,9 +207,6 @@
     <None Include="shaders\brdfPS.hlsl">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="shaders\brdfVS.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
     <None Include="shaders\brightnessPS.hlsl">
       <Filter>Shaders</Filter>
     </None>
@@ -231,22 +228,43 @@
     <None Include="shaders\downsamplePS.hlsl">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="shaders\LightCalc.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
     <None Include="shaders\mappingVS.hlsl">
       <Filter>Shaders</Filter>
     </None>
     <None Include="shaders\prefilteredColorPS.hlsl">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="shaders\PS.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
     <None Include="shaders\SceneMatrixBuffer.hlsli">
       <Filter>Shaders</Filter>
     </None>
     <None Include="shaders\tonemapPS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\SimpleLightCalc.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\SimpleSceneMatrixBuffer.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\LightCalc.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\downsampleOnlyMaxPS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\shadowPS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\shadowVS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\simplePS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\simpleVS.hlsl">
       <Filter>Shaders</Filter>
     </None>
     <None Include="shaders\VS.hlsl">

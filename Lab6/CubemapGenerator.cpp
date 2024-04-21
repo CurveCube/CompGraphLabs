@@ -418,7 +418,7 @@ HRESULT CubemapGenerator::RenderBRDF() {
 
     std::shared_ptr<VertexShader> vs;
     std::shared_ptr<PixelShader> ps;
-    result = managerStorage_->GetVSManager()->LoadShader(vs, L"shaders/brdfVS.hlsl");
+    result = managerStorage_->GetVSManager()->LoadShader(vs, L"shaders/mappingVS.hlsl");
     if (FAILED(result)) {
         return result;
     }

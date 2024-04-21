@@ -8,8 +8,8 @@
 
 namespace {
     std::string GenerateKey(D3D11_FILTER filter, D3D11_TEXTURE_ADDRESS_MODE modeU,
-        D3D11_TEXTURE_ADDRESS_MODE modeV, D3D11_TEXTURE_ADDRESS_MODE modeW) {
-        return std::to_string(filter) + "_" + std::to_string(modeU) + "_" + std::to_string(modeV) + "_" + std::to_string(modeW);
+        D3D11_TEXTURE_ADDRESS_MODE modeV, D3D11_TEXTURE_ADDRESS_MODE modeW, D3D11_COMPARISON_FUNC compFunc) {
+        return std::to_string(filter) + "_" + std::to_string(modeU) + "_" + std::to_string(modeV) + "_" + std::to_string(modeW) + "_" + std::to_string(compFunc);
     };
 
     std::string GenerateKey(D3D11_COMPARISON_FUNC compFunc, D3D11_DEPTH_WRITE_MASK mask) {
@@ -78,14 +78,15 @@ public:
     };
 
     bool CheckSamplerState(D3D11_FILTER filter, D3D11_TEXTURE_ADDRESS_MODE modeU = D3D11_TEXTURE_ADDRESS_WRAP,
-        D3D11_TEXTURE_ADDRESS_MODE modeV = D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_MODE modeW = D3D11_TEXTURE_ADDRESS_WRAP) const {
-        return samplerStates_.find(GenerateKey(filter, modeU, modeV, modeW)) != samplerStates_.end();
+        D3D11_TEXTURE_ADDRESS_MODE modeV = D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_MODE modeW = D3D11_TEXTURE_ADDRESS_WRAP,
+        D3D11_COMPARISON_FUNC compFunc = D3D11_COMPARISON_NEVER) const {
+        return samplerStates_.find(GenerateKey(filter, modeU, modeV, modeW, compFunc)) != samplerStates_.end();
     };
 
     HRESULT CreateSamplerState(std::shared_ptr<ID3D11SamplerState>& object, D3D11_FILTER filter,
         D3D11_TEXTURE_ADDRESS_MODE modeU = D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_MODE modeV = D3D11_TEXTURE_ADDRESS_WRAP,
-        D3D11_TEXTURE_ADDRESS_MODE modeW = D3D11_TEXTURE_ADDRESS_WRAP) {
-        if (SUCCEEDED(GetSamplerState(object, filter, modeU, modeV, modeW))) {
+        D3D11_TEXTURE_ADDRESS_MODE modeW = D3D11_TEXTURE_ADDRESS_WRAP, D3D11_COMPARISON_FUNC compFunc = D3D11_COMPARISON_NEVER) {
+        if (SUCCEEDED(GetSamplerState(object, filter, modeU, modeV, modeW, compFunc))) {
             return S_OK;
         }
 
@@ -98,28 +99,29 @@ public:
         desc.MaxLOD = FLT_MAX;
         desc.MipLODBias = 0.0f;
         desc.MaxAnisotropy = 16;
-        desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+        desc.ComparisonFunc = compFunc;
         desc.BorderColor[0] = desc.BorderColor[1] = desc.BorderColor[2] = desc.BorderColor[3] = 1.0f;
 
         ID3D11SamplerState* sampler;
         HRESULT result = device_->GetDevice()->CreateSamplerState(&desc, &sampler);
         if (SUCCEEDED(result)) {
             object = std::shared_ptr<ID3D11SamplerState>(sampler, utilities::DXPtrDeleter<ID3D11SamplerState*>);
-            samplerStates_.emplace(GenerateKey(filter, modeU, modeV, modeW), object);
+            samplerStates_.emplace(GenerateKey(filter, modeU, modeV, modeW, compFunc), object);
         }
         return result;
     };
 
     HRESULT CreateSamplerState(D3D11_FILTER filter, D3D11_TEXTURE_ADDRESS_MODE modeU = D3D11_TEXTURE_ADDRESS_WRAP,
-        D3D11_TEXTURE_ADDRESS_MODE modeV = D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_MODE modeW = D3D11_TEXTURE_ADDRESS_WRAP) {
+        D3D11_TEXTURE_ADDRESS_MODE modeV = D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_MODE modeW = D3D11_TEXTURE_ADDRESS_WRAP,
+        D3D11_COMPARISON_FUNC compFunc = D3D11_COMPARISON_NEVER) {
         std::shared_ptr<ID3D11SamplerState> object;
-        return CreateSamplerState(object, filter, modeU, modeV, modeW);
+        return CreateSamplerState(object, filter, modeU, modeV, modeW, compFunc);
     };
 
     HRESULT GetSamplerState(std::shared_ptr<ID3D11SamplerState>& object, D3D11_FILTER filter,
         D3D11_TEXTURE_ADDRESS_MODE modeU = D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_MODE modeV = D3D11_TEXTURE_ADDRESS_WRAP,
-        D3D11_TEXTURE_ADDRESS_MODE modeW = D3D11_TEXTURE_ADDRESS_WRAP) const {
-        auto result = samplerStates_.find(GenerateKey(filter, modeU, modeV, modeW));
+        D3D11_TEXTURE_ADDRESS_MODE modeW = D3D11_TEXTURE_ADDRESS_WRAP, D3D11_COMPARISON_FUNC compFunc = D3D11_COMPARISON_NEVER) const {
+        auto result = samplerStates_.find(GenerateKey(filter, modeU, modeV, modeW, compFunc));
         if (result == samplerStates_.end()) {
             return E_FAIL;
         }

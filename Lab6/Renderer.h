@@ -7,12 +7,12 @@
 #include "ToneMapping.h"
 #include "CubemapGenerator.h"
 #include "SkyBox.h"
-#include "Light.h"
+#include "Light.hpp"
 #include "Scene.h"
 #include <vector>
 #include <string>
 
-#include "SimpleObject.hpp" // temporary, will be replaced with scene
+// #include "SimpleObject.hpp" // temporary, will be replaced with scene
 
 
 class Renderer {
@@ -69,9 +69,10 @@ private:
     SwapChain swapChain_;
     ToneMapping toneMapping_;
     SceneManager sceneManager_;
-    SimpleObject sphere_;
+    // SimpleObject sphere_;
 
     std::vector<SpotLight> lights_;
+    std::shared_ptr<DirectionalLight> dirLight_; // transmitted outward ->
 
 #ifdef _DEBUG
     ID3DUserDefinedAnnotation* pAnnotation_ = nullptr; // always remains only inside the class #

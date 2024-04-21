@@ -2,7 +2,7 @@
 
 #include "ManagerStorage.hpp"
 #include "Camera.hpp"
-#include "Light.h"
+#include "Light.hpp"
 
 
 class SimpleObject {
@@ -81,9 +81,6 @@ public:
             result = managerStorage_->GetStateManager()->CreateRasterizerState(rasterizerState_);
         }
         if (SUCCEEDED(result)) {
-            result = managerStorage_->GetStateManager()->CreateSamplerState(samplerDefault_, D3D11_FILTER_ANISOTROPIC);
-        }
-        if (SUCCEEDED(result)) {
             result = managerStorage_->GetStateManager()->CreateSamplerState(samplerAvg_, D3D11_FILTER_MIN_MAG_MIP_LINEAR,
                 D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP);
         }
@@ -121,8 +118,8 @@ public:
         }
         device_->GetDeviceContext()->Unmap(viewMatrixBuffer_, 0);
 
-        ID3D11SamplerState* samplers[] = { samplerDefault_.get(), samplerAvg_.get() };
-        device_->GetDeviceContext()->PSSetSamplers(0, 2, samplers);
+        ID3D11SamplerState* samplers[] = { samplerAvg_.get() };
+        device_->GetDeviceContext()->PSSetSamplers(0, 1, samplers);
 
         ID3D11ShaderResourceView* resources[] = { irradianceMap.get(), prefilteredMap.get(), BRDF.get() };
         device_->GetDeviceContext()->PSSetShaderResources(0, 3, resources);
@@ -176,7 +173,6 @@ public:
         PSNDF_.reset();
         PSGeometry_.reset();
         dsState_.reset();
-        samplerDefault_.reset();
         samplerAvg_.reset();
         rasterizerState_.reset();
 
@@ -328,22 +324,22 @@ private:
     };
 
     HRESULT LoadShaders() {
-        HRESULT result = managerStorage_->GetVSManager()->LoadShader(VS_, L"shaders/VS.hlsl", {}, VertexDesc);
+        HRESULT result = managerStorage_->GetVSManager()->LoadShader(VS_, L"shaders/simpleVS.hlsl", {}, VertexDesc);
         if (SUCCEEDED(result)) {
             std::vector<std::string> shaderMacros = { "DEFAULT" };
-            result = managerStorage_->GetPSManager()->LoadShader(PS_, L"shaders/PS.hlsl", shaderMacros);
+            result = managerStorage_->GetPSManager()->LoadShader(PS_, L"shaders/simplePS.hlsl", shaderMacros);
         }
         if (SUCCEEDED(result)) {
             std::vector<std::string> shaderMacros = { "FRESNEL" };
-            result = managerStorage_->GetPSManager()->LoadShader(PSFresnel_, L"shaders/PS.hlsl", shaderMacros);
+            result = managerStorage_->GetPSManager()->LoadShader(PSFresnel_, L"shaders/simplePS.hlsl", shaderMacros);
         }
         if (SUCCEEDED(result)) {
             std::vector<std::string> shaderMacros = { "ND" };
-            result = managerStorage_->GetPSManager()->LoadShader(PSNDF_, L"shaders/PS.hlsl", shaderMacros);
+            result = managerStorage_->GetPSManager()->LoadShader(PSNDF_, L"shaders/simplePS.hlsl", shaderMacros);
         }
         if (SUCCEEDED(result)) {
             std::vector<std::string> shaderMacros = { "GEOMETRY" };
-            result = managerStorage_->GetPSManager()->LoadShader(PSGeometry_, L"shaders/PS.hlsl", shaderMacros);
+            result = managerStorage_->GetPSManager()->LoadShader(PSGeometry_, L"shaders/simplePS.hlsl", shaderMacros);
         }
         return result;
     };
@@ -368,7 +364,6 @@ private:
     std::shared_ptr<PixelShader> PSNDF_; // provided externally <-
     std::shared_ptr<PixelShader> PSGeometry_; // provided externally <-
     std::shared_ptr<ID3D11DepthStencilState> dsState_; // provided externally <-
-    std::shared_ptr<ID3D11SamplerState> samplerDefault_; // provided externally <-
     std::shared_ptr<ID3D11SamplerState> samplerAvg_; // provided externally <-
     std::shared_ptr<ID3D11RasterizerState> rasterizerState_; // provided externally <-
 

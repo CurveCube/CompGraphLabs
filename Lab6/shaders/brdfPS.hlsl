@@ -3,8 +3,10 @@ struct PS_INPUT {
     float2 uv : TEXCOORD;
 };
 
-float GeometrySchlickGGX(float NdotV, float roughness)
-{
+static float PI = 3.14159265359f;
+
+
+float GeometrySchlickGGX(float NdotV, float roughness) {
     float a = roughness;
     float k = (a * a) / 2.0;
 
@@ -13,9 +15,8 @@ float GeometrySchlickGGX(float NdotV, float roughness)
 
     return nom / denom;
 }
-// ----------------------------------------------------------------------------
-float GeometrySmith(float3 N, float3 V, float3 L, float roughness)
-{
+
+float GeometrySmith(float3 N, float3 V, float3 L, float roughness) {
     float NdotV = max(dot(N, V), 0.0);
     float NdotL = max(dot(N, L), 0.0);
     float ggx2 = GeometrySchlickGGX(NdotV, roughness);
@@ -24,10 +25,7 @@ float GeometrySmith(float3 N, float3 V, float3 L, float roughness)
     return ggx1 * ggx2;
 }
 
-static float PI = 3.14159265359f;
-
-float RadicalInverse_Vdc(uint bits)
-{
+float RadicalInverse_Vdc(uint bits) {
     bits = (bits << 16u) | (bits >> 16u);
     bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
     bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
@@ -36,13 +34,11 @@ float RadicalInverse_Vdc(uint bits)
     return float(bits) * 2.3283064365386963e-10; // / 0x100000000
 }
 
-float2 Hammersley(uint i, uint N)
-{
+float2 Hammersley(uint i, uint N) {
     return float2(float(i) / float(N), RadicalInverse_Vdc(i));
 }
 
-float3 ImportanceSampleGGX(float2 Xi, float3 N, float roughness)
-{
+float3 ImportanceSampleGGX(float2 Xi, float3 N, float roughness) {
     float a = roughness * roughness;
 
     float phi = 2.0 * PI * Xi.x;
@@ -61,8 +57,7 @@ float3 ImportanceSampleGGX(float2 Xi, float3 N, float roughness)
     return tangent * H.x + bitangent * H.y + N * H.z;
 }
 
-float2 IntegrateBRDF(float NdotV, float roughness)
-{
+float2 IntegrateBRDF(float NdotV, float roughness) {
     float3 V;
     V.x = sqrt(1.0 - NdotV * NdotV);
     V.y = 0.0;
@@ -74,8 +69,7 @@ float2 IntegrateBRDF(float NdotV, float roughness)
     float3 N = float3(0.0f, 0.0f, 1.0f);
 
     const uint SAMPLE_COUNT = 1024u;
-    for (uint i = 0u; i < SAMPLE_COUNT; ++i)
-    {
+    for (uint i = 0u; i < SAMPLE_COUNT; ++i) {
         float2 Xi = Hammersley(i, SAMPLE_COUNT);
         float3 H = ImportanceSampleGGX(Xi, N, roughness);
         float3 L = normalize(2.0f * dot(V, H) * H - V);
@@ -84,8 +78,7 @@ float2 IntegrateBRDF(float NdotV, float roughness)
         float NdotH = max(H.z, 0.0);
         float VdotH = max(dot(V, H), 0.0);
 
-        if (NdotL > 0.0)
-        {
+        if (NdotL > 0.0) {
             float G = GeometrySmith(N, V, L, roughness);
             float G_Vis = (G * VdotH) / (NdotH * NdotV);
             float Fc = pow(1.0 - VdotH, 5.0);
@@ -100,7 +93,7 @@ float2 IntegrateBRDF(float NdotV, float roughness)
 }
 
 
-float4 main(PS_INPUT input) : SV_TARGET{
+float4 main(PS_INPUT input) : SV_TARGET {
     float2 integratedBRDF = IntegrateBRDF(input.uv.x, input.uv.y);
     return float4(integratedBRDF, 0.0f, 1.0f);
 }

@@ -49,7 +49,7 @@
     <ClInclude Include="imgui\imstb_textedit.h" />
     <ClInclude Include="imgui\imstb_truetype.h" />
     <ClInclude Include="Lab6.h" />
-    <ClInclude Include="Light.h" />
+    <ClInclude Include="Light.hpp" />
     <ClInclude Include="ManagerStorage.hpp" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="resource.h" />
@@ -83,9 +83,6 @@
     <None Include="shaders\brdfPS.hlsl">
       <FileType>Document</FileType>
     </None>
-    <None Include="shaders\brdfVS.hlsl">
-      <FileType>Document</FileType>
-    </None>
     <None Include="shaders\brightnessPS.hlsl">
       <FileType>Document</FileType>
     </None>
@@ -113,10 +110,31 @@
     <None Include="shaders\prefilteredColorPS.hlsl">
       <FileType>Document</FileType>
     </None>
+    <None Include="shaders\SimpleLightCalc.hlsli" />
+    <None Include="shaders\SimpleSceneMatrixBuffer.hlsli" />
+    <None Include="shaders\tonemapPS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\downsampleOnlyMaxPS.hlsl">
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
+      <FileType>Document</FileType>
+    </None>
     <None Include="shaders\PS.hlsl">
       <FileType>Document</FileType>
     </None>
-    <None Include="shaders\tonemapPS.hlsl">
+    <None Include="shaders\shadowPS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\shadowVS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\simplePS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\simpleVS.hlsl">
       <FileType>Document</FileType>
     </None>
     <None Include="shaders\VS.hlsl">

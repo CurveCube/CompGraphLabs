@@ -6,7 +6,9 @@ struct PS_INPUT {
     float3 localPos : POSITION;
 };
 
-float4 main(PS_INPUT input) : SV_TARGET{
+static float PI = 3.14159265359f;
+
+float4 main(PS_INPUT input) : SV_TARGET {
     float3 normal = normalize(input.localPos);
     float3 dir = abs(normal.z) < 0.999 ? float3(0.0f, 0.0f, 1.0f) : float3(1.0f, 0.0f, 0.0f);
     float3 tangent = normalize(cross(dir, normal));
@@ -14,7 +16,6 @@ float4 main(PS_INPUT input) : SV_TARGET{
     float3 irradiance = float3(0.0f, 0.0f, 0.0f);
     static int N1 = 1000;
     static int N2 = 250;
-    static float PI = 3.14159265359f;
     for (int i = 0; i < N1; i++) {
         for (int j = 0; j < N2; j++) {
             float phi = i * (2 * PI / N1);

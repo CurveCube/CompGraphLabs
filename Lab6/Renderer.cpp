@@ -45,13 +45,14 @@ bool Renderer::Init(HINSTANCE hInstance, HWND hWnd) {
     if (SUCCEEDED(result)) {
         camera_ = std::shared_ptr<Camera>(new Camera(XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 3.0f, 3.0f), XM_PI / 3, width_,
             height_, 0.01f, 100.0f));
+        dirLight_ = std::make_shared<DirectionalLight>();
     }
     if (SUCCEEDED(result)) {
         skybox_ = std::shared_ptr<Skybox>(new Skybox());
         result = skybox_->Init(device_, managerStorage_, camera_, environmentMap_);
     }
     if (SUCCEEDED(result)) {
-        result = sceneManager_.Init(device_, managerStorage_, camera_);
+        result = sceneManager_.Init(device_, managerStorage_, camera_, dirLight_, width_, height_);
     }
     if (SUCCEEDED(result)) {
         UINT index = 0;
@@ -61,9 +62,9 @@ bool Renderer::Init(HINSTANCE hInstance, HWND hWnd) {
             result = E_FAIL;
         }
     }
-    if (SUCCEEDED(result)) {
+    /*if (SUCCEEDED(result)) {
         result = sphere_.Init(device_, managerStorage_, camera_);
-    }
+    }*/
     if (SUCCEEDED(result)) {
         result = toneMapping_.Init(device_, managerStorage_, width_, height_);
     }
@@ -147,25 +148,29 @@ void Renderer::UpdateImgui() {
         ImGui::Text(str.c_str());
 
         static int cur = 0;
-        if (ImGui::Combo("Mode", &cur, "default\0fresnel\0ndf\0geometry")) {
+        if (ImGui::Combo("Mode", &cur, "default\0point light fresnel\0point light ndf\0point light geometry")) {
             switch (cur) {
             case 0:
                 default_ = true;
-                sphere_.SetMode(SimpleObject::DEFAULT);
+                //sphere_.SetMode(SimpleObject::DEFAULT);
+                sceneManager_.SetMode(SceneManager::DEFAULT);
                 break;
             case 1:
                 default_ = false;
-                sphere_.SetMode(SimpleObject::FRESNEL);
+                //sphere_.SetMode(SimpleObject::FRESNEL);
+                sceneManager_.SetMode(SceneManager::FRESNEL);
                 toneMapping_.ResetEyeAdaptation();
                 break;
             case 2:
                 default_ = false;
-                sphere_.SetMode(SimpleObject::NDF);
+                //sphere_.SetMode(SimpleObject::NDF);
+                sceneManager_.SetMode(SceneManager::NDF);
                 toneMapping_.ResetEyeAdaptation();
                 break;
             case 3:
                 default_ = false;
-                sphere_.SetMode(SimpleObject::GEOMETRY);
+                //sphere_.SetMode(SimpleObject::GEOMETRY);
+                sceneManager_.SetMode(SceneManager::GEOMETRY);
                 toneMapping_.ResetEyeAdaptation();
                 break;
             default:
@@ -181,7 +186,7 @@ void Renderer::UpdateImgui() {
             toneMapping_.SetFactor(factor);
         }
 
-        str = "Object";
+        /*str = "Object";
         ImGui::Text(str.c_str());
 
         static float objCol[3];
@@ -203,14 +208,42 @@ void Renderer::UpdateImgui() {
         objMetal = sphere_.metalness_;
         str = "Metalness";
         ImGui::DragFloat(str.c_str(), &objMetal, 0.01f, 0.0f, 1.0f);
-        sphere_.metalness_ = objMetal;
+        sphere_.metalness_ = objMetal;*/
 
-        str = "Lights";
+        str = "Directional light";
+        ImGui::Text(str.c_str());
+
+        static float colDir[3];
+        static float brightnessDir;
+
+        colDir[0] = dirLight_->color.x;
+        colDir[1] = dirLight_->color.y;
+        colDir[2] = dirLight_->color.z;
+        str = "Color";
+        ImGui::ColorEdit3(str.c_str(), colDir);
+
+        brightnessDir = dirLight_->color.w;
+        str = "Brightness";
+        ImGui::DragFloat(str.c_str(), &brightnessDir, 1.0f, 1.0f, 1000.0f);
+        dirLight_->color = XMFLOAT4(colDir[0], colDir[1], colDir[2], brightnessDir);
+
+        str = "Phi";
+        ImGui::DragFloat(str.c_str(), &dirLight_->phi, 0.01f, 0.0f, XM_2PI);
+
+        str = "Theta";
+        ImGui::DragFloat(str.c_str(), &dirLight_->theta, 0.01f, -XM_PIDIV2, XM_PIDIV2);
+
+        str = "Distance";
+        ImGui::DragFloat(str.c_str(), &dirLight_->r, 1.0f, 10.0f, 1000.0f);
+
+        dirLight_->Update(camera_->GetPosition());
+
+        str = "Point lights";
         ImGui::Text(str.c_str());
         ImGui::SameLine();
         if (ImGui::Button("+")) {
             if (lights_.size() < MAX_LIGHT)
-                lights_.push_back({ XMFLOAT4(5.0f, 5.0f, 5.0f, 0.f), XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f) });
+                lights_.push_back({ XMFLOAT4(5.0f, 5.0f, 5.0f, 0.0f), XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f) });
         }
         ImGui::SameLine();
         if (ImGui::Button("-")) {
@@ -219,7 +252,7 @@ void Renderer::UpdateImgui() {
         }
 
         static float col[MAX_LIGHT][3];
-        static float pos[MAX_LIGHT][4];
+        static float pos[MAX_LIGHT][3];
         static float brightness[MAX_LIGHT];
         for (int i = 0; i < lights_.size(); i++) {
             std::string str = "Light " + std::to_string(i);
@@ -256,6 +289,16 @@ bool Renderer::Render() {
     pAnnotation_->BeginEvent(L"Preliminary_preparations");
 #endif
 
+    if (default_) {
+        if (!sceneManager_.CreateShadowMaps({ 0 })) {
+            return false;
+        }
+    }
+
+    if (!sceneManager_.PrepareTransparent({ 0 })) {
+        return false;
+    }
+
     UpdateImgui();
     device_->GetDeviceContext()->ClearState();
     device_->GetDeviceContext()->RSSetViewports(1, &viewport_);
@@ -282,19 +325,14 @@ bool Renderer::Render() {
 
 #ifdef _DEBUG
     pAnnotation_->EndEvent();
-    pAnnotation_->BeginEvent(L"Draw_sphere");
+    pAnnotation_->BeginEvent(L"Draw_scene");
 #endif
 
-    if (!sphere_.Render(irradianceMap_, prefilteredMap_, BRDF_, lights_)) {
+    /*if (!sphere_.Render(irradianceMap_, prefilteredMap_, BRDF_, lights_)) {
         return false;
-    }
+    }*/
 
-#ifdef _DEBUG
-    pAnnotation_->EndEvent();
-    pAnnotation_->BeginEvent(L"Draw_skybox");
-#endif
-
-    if (!skybox_->Render()) {
+    if (!sceneManager_.Render(irradianceMap_, prefilteredMap_, BRDF_, skybox_, lights_, { 0 })) {
         return false;
     }
 
@@ -373,6 +411,9 @@ bool Renderer::Resize(UINT width, UINT height) {
     if (!toneMapping_.Resize(width_, height_)) {
         return false;
     }
+    if (!sceneManager_.Resize(width_, height_)) {
+        return false;
+    }
 
     return true;
 }
@@ -382,6 +423,7 @@ void Renderer::MoveCamera(int upDown, int rightLeft, int forwardBack) {
         dy = camera_->GetDistanceToFocus() * upDown / 30.0f,
         dz = -camera_->GetDistanceToFocus() * rightLeft / 30.0f;
     camera_->Move(dx, dy, dz);
+    dirLight_->Update(camera_->GetPosition());
 }
 
 void Renderer::OnMouseWheel(int delta) {
@@ -398,6 +440,7 @@ void Renderer::OnMouseMove(int x, int y) {
         camera_->Rotate((mousePrevX_ - x) / 200.0f, (y - mousePrevY_) / 200.0f);
         mousePrevX_ = x;
         mousePrevY_ = y;
+        dirLight_->Update(camera_->GetPosition());
     }
 }
 
@@ -411,7 +454,7 @@ void Renderer::Cleanup() {
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 
-    sphere_.Cleanup();
+    //sphere_.Cleanup();
     toneMapping_.Cleanup();
     sceneManager_.Cleanup();
     swapChain_.Cleanup();
@@ -426,6 +469,7 @@ void Renderer::Cleanup() {
     factory_.reset();
     selectedAdapter_.reset();
     camera_.reset();
+    dirLight_.reset();
     managerStorage_.reset();
     skybox_.reset();
     environmentMap_.reset();

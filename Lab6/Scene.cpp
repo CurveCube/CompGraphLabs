@@ -21,10 +21,24 @@ SceneManager::SceneManager() {
     shadowMapViewport_.Height = shadowMapSize;
     shadowMapViewport_.MinDepth = 0.0f;
     shadowMapViewport_.MaxDepth = 1.0f;
+
+    transparentViewport_.TopLeftX = 0;
+    transparentViewport_.TopLeftY = 0;
+    transparentViewport_.Width = shadowMapSize;
+    transparentViewport_.Height = shadowMapSize;
+    transparentViewport_.MinDepth = 0.0f;
+    transparentViewport_.MaxDepth = 1.0f;
+
+    downsampleViewport_.TopLeftX = 0;
+    downsampleViewport_.TopLeftY = 0;
+    downsampleViewport_.Width = 1.0f;
+    downsampleViewport_.Height = 1.0f;
+    downsampleViewport_.MinDepth = 0.0f;
+    downsampleViewport_.MaxDepth = 1.0f;
 }
 
 HRESULT SceneManager::Init(const std::shared_ptr<Device>& device, const std::shared_ptr<ManagerStorage>& managerStorage,
-    const std::shared_ptr<Camera>& camera) {
+    const std::shared_ptr<Camera>& camera, const std::shared_ptr<DirectionalLight>& directionalLight, int width, int height) {
     if (!managerStorage->IsInit() || !device->IsInit()) {
         return E_FAIL;
     }
@@ -32,7 +46,149 @@ HRESULT SceneManager::Init(const std::shared_ptr<Device>& device, const std::sha
     device_ = device;
     managerStorage_ = managerStorage;
     camera_ = camera;
+    directionalLight_ = directionalLight;
 
+    transparentViewport_.Width = width;
+    transparentViewport_.Height = height;
+
+    HRESULT result = S_OK;
+    for (UINT i = 0; i < CSM_SPLIT_COUNT && SUCCEEDED(result); ++i) {
+        result = CreateDepthStencilView(shadowMapSize, shadowMapSize, shadowBuffers_[i], shadowDSViews_[i], shadowSRViews_[i]);
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetStateManager()->CreateDepthStencilState(shadowDepthStencilState_, D3D11_COMPARISON_LESS);
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetStateManager()->CreateSamplerState(samplerPCF_, D3D11_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP,
+            D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_COMPARISON_LESS);
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetStateManager()->CreateSamplerState(samplerAvg_, D3D11_FILTER_MIN_MAG_MIP_LINEAR,
+            D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP);
+    }
+    if (SUCCEEDED(result)) {
+        result = CreateAuxiliaryForTransparent(width, height);
+    }
+    if (SUCCEEDED(result)) {
+        result = CreateBuffers();
+    }
+
+    return result;
+}
+
+HRESULT SceneManager::CreateDepthStencilView(int width, int height, ID3D11Texture2D* buffer, ID3D11DepthStencilView* DSV, ID3D11ShaderResourceView* SRV) {
+    D3D11_TEXTURE2D_DESC desc = {};
+    desc.Format = DXGI_FORMAT_R32_TYPELESS;
+    desc.ArraySize = 1;
+    desc.MipLevels = 1;
+    desc.Usage = D3D11_USAGE_DEFAULT;
+    desc.Height = height;
+    desc.Width = width;
+    desc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
+    desc.CPUAccessFlags = 0;
+    desc.MiscFlags = 0;
+    desc.SampleDesc.Count = 1;
+    desc.SampleDesc.Quality = 0;
+    HRESULT result = device_->GetDevice()->CreateTexture2D(&desc, nullptr, &buffer);
+    if (SUCCEEDED(result)) {
+        D3D11_DEPTH_STENCIL_VIEW_DESC desc = {};
+        desc.Format = DXGI_FORMAT_D32_FLOAT;
+        desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+        desc.Texture2D.MipSlice = 0;
+        desc.Flags = 0;
+        result = device_->GetDevice()->CreateDepthStencilView(buffer, &desc, &DSV);
+    }
+    if (SUCCEEDED(result)) {
+        D3D11_SHADER_RESOURCE_VIEW_DESC desc = {};
+        desc.Format = DXGI_FORMAT_R32_FLOAT;
+        desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+        desc.Texture2D.MipLevels = 1;
+        desc.Texture2D.MostDetailedMip = 0;
+        result = device_->GetDevice()->CreateShaderResourceView(buffer, &desc, &SRV);
+    }
+    return result;
+}
+
+HRESULT SceneManager::CreateAuxiliaryForTransparent(int width, int height) {
+    n = 0;
+    int minSide = min(width, height);
+    while (minSide >>= 1) {
+        n++;
+    }
+
+    HRESULT result = managerStorage_->GetVSManager()->LoadShader(mappingVS_, L"shaders/mappingVS.hlsl");
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetPSManager()->LoadShader(downsamplePS_, L"shaders/downsampleOnlyMaxPS.hlsl");
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetStateManager()->CreateDepthStencilState(transparentDepthStencilState_);
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetStateManager()->CreateSamplerState(samplerMax_, D3D11_FILTER_MAXIMUM_ANISOTROPIC);
+    }
+    if (SUCCEEDED(result)) {
+        D3D11_TEXTURE2D_DESC textureDesc = {};
+        textureDesc.Width = 1;
+        textureDesc.Height = 1;
+        textureDesc.MipLevels = 1;
+        textureDesc.ArraySize = 1;
+        textureDesc.Format = DXGI_FORMAT_R32_FLOAT;
+        textureDesc.SampleDesc.Count = 1;
+        textureDesc.Usage = D3D11_USAGE_STAGING;
+        textureDesc.BindFlags = 0;
+        textureDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+        textureDesc.MiscFlags = 0;
+        result = device_->GetDevice()->CreateTexture2D(&textureDesc, nullptr, &readMaxTexture_);
+    }
+    if (SUCCEEDED(result)) {
+        result = CreateDepthStencilView(width, height, transparentDepthBuffer_, transparentDSViews_, transparentSRViews_);
+    }
+    for (int i = 0; i < n + 1 && SUCCEEDED(result); ++i) {
+        RawPtrTexture texture;
+        result = CreateTexture(texture, i);
+        if (SUCCEEDED(result)) {
+            scaledFrames_.push_back(texture);
+        }
+    }
+
+    return result;
+}
+
+HRESULT SceneManager::CreateTexture(RawPtrTexture& texture, int i) {
+    D3D11_TEXTURE2D_DESC textureDesc = {};
+    textureDesc.Width = pow(2, i);
+    textureDesc.Height = pow(2, i);
+    textureDesc.MipLevels = 1;
+    textureDesc.ArraySize = 1;
+    textureDesc.Format = DXGI_FORMAT_R32_FLOAT;
+    textureDesc.SampleDesc.Count = 1;
+    textureDesc.Usage = D3D11_USAGE_DEFAULT;
+    textureDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+    textureDesc.CPUAccessFlags = 0;
+    textureDesc.MiscFlags = 0;
+    HRESULT result = device_->GetDevice()->CreateTexture2D(&textureDesc, nullptr, &texture.texture);
+    if (SUCCEEDED(result)) {
+        D3D11_RENDER_TARGET_VIEW_DESC renderTargetViewDesc;
+        renderTargetViewDesc.Format = DXGI_FORMAT_R32_FLOAT;
+        renderTargetViewDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+        renderTargetViewDesc.Texture2D.MipSlice = 0;
+
+        result = device_->GetDevice()->CreateRenderTargetView(texture.texture, &renderTargetViewDesc, &texture.RTV);
+    }
+    if (SUCCEEDED(result)) {
+        D3D11_SHADER_RESOURCE_VIEW_DESC shaderResourceViewDesc;
+        shaderResourceViewDesc.Format = DXGI_FORMAT_R32_FLOAT;
+        shaderResourceViewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+        shaderResourceViewDesc.Texture2D.MostDetailedMip = 0;
+        shaderResourceViewDesc.Texture2D.MipLevels = 1;
+
+        result = device_->GetDevice()->CreateShaderResourceView(texture.texture, &shaderResourceViewDesc, &texture.SRV);
+    }
+
+    return result;
+}
+
+HRESULT SceneManager::CreateBuffers() {
     D3D11_BUFFER_DESC desc = {};
     desc.ByteWidth = sizeof(WorldMatrixBuffer);
     desc.Usage = D3D11_USAGE_DEFAULT;
@@ -41,11 +197,6 @@ HRESULT SceneManager::Init(const std::shared_ptr<Device>& device, const std::sha
     desc.MiscFlags = 0;
     desc.StructureByteStride = 0;
     HRESULT result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &worldMatrixBuffer_);
-
-    if (SUCCEEDED(result)) {
-        result = CreateDepthStencilViews();
-    }
-
     if (SUCCEEDED(result)) {
         D3D11_BUFFER_DESC desc = {};
         desc.ByteWidth = sizeof(ViewMatrixBuffer);
@@ -56,7 +207,6 @@ HRESULT SceneManager::Init(const std::shared_ptr<Device>& device, const std::sha
         desc.StructureByteStride = 0;
         result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &viewMatrixBuffer_);
     }
-
     if (SUCCEEDED(result)) {
         D3D11_BUFFER_DESC desc = {};
         desc.ByteWidth = sizeof(MaterialParamsBuffer);
@@ -67,43 +217,25 @@ HRESULT SceneManager::Init(const std::shared_ptr<Device>& device, const std::sha
         desc.StructureByteStride = 0;
         result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &materialParamsBuffer_);
     }
-
-    return result;
-}
-
-HRESULT SceneManager::CreateDepthStencilViews() {
-    HRESULT result = S_OK;
-    for (UINT i = 0; i < CSM_SPLIT_COUNT && SUCCEEDED(result); ++i) {
-        D3D11_TEXTURE2D_DESC desc = {};
-        desc.Format = DXGI_FORMAT_R32_TYPELESS;
-        desc.ArraySize = 1;
-        desc.MipLevels = 1;
+    if (SUCCEEDED(result)) {
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = sizeof(ShadowMapViewMatrixBuffer);
         desc.Usage = D3D11_USAGE_DEFAULT;
-        desc.Height = shadowMapSize;
-        desc.Width = shadowMapSize;
-        desc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
+        desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         desc.CPUAccessFlags = 0;
         desc.MiscFlags = 0;
-        desc.SampleDesc.Count = 1;
-        desc.SampleDesc.Quality = 0;
-
-        result = device_->GetDevice()->CreateTexture2D(&desc, nullptr, &shadowBuffers_[i]);
-        if (SUCCEEDED(result)) {
-            D3D11_DEPTH_STENCIL_VIEW_DESC desc = {};
-            desc.Format = DXGI_FORMAT_D32_FLOAT;
-            desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-            desc.Texture2D.MipSlice = 0;
-            desc.Flags = 0;
-            result = device_->GetDevice()->CreateDepthStencilView(shadowBuffers_[i], &desc, &shadowDSViews_[i]);
-        }
-        if (SUCCEEDED(result)) {
-            D3D11_SHADER_RESOURCE_VIEW_DESC desc = {};
-            desc.Format = DXGI_FORMAT_R32_FLOAT;
-            desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-            desc.Texture2D.MipLevels = 1;
-            desc.Texture2D.MostDetailedMip = 0;
-            result = device_->GetDevice()->CreateShaderResourceView(shadowBuffers_[i], &desc, &shadowSRViews_[i]);
-        }
+        desc.StructureByteStride = 0;
+        result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &shadowMapViewMatrixBuffer_);
+    }
+    if (SUCCEEDED(result)) {
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = sizeof(ShadowMapAlphaCutoffBuffer);
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+        result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &shadowMapAlphaCutoffBuffer_);
     }
     return result;
 }
@@ -186,13 +318,14 @@ HRESULT SceneManager::CreateBufferAccessors(const tinygltf::Model& model, SceneA
         data.SysMemPitch = gbv.byteLength;
         data.SysMemSlicePitch = 0;
 
-        result = device_->GetDevice()->CreateBuffer(&desc, &data, &accessor.buffer);
+        ID3D11Buffer* buffer = nullptr;
+        result = device_->GetDevice()->CreateBuffer(&desc, &data, &buffer);
         delete[] bufferPart;
         if (FAILED(result)) {
             break;
         }
+        accessor.buffer = std::shared_ptr<ID3D11Buffer>(buffer, utilities::DXPtrDeleter<ID3D11Buffer*>);
         arrays.accessors.push_back(accessor);
-        accessor.reset();
     }
     return result;
 }
@@ -527,19 +660,29 @@ HRESULT SceneManager::CreateMaterials(const tinygltf::Model& model, SceneArrays&
         material.normalScale = gm.normalTexture.scale;
 
         int index = gm.pbrMetallicRoughness.baseColorTexture.index;
-        material.baseColorTA = { gm.pbrMetallicRoughness.baseColorTexture.texCoord, model.textures[index].source, model.textures[index].sampler, true };
+        if (index >= 0) {
+            material.baseColorTA = { gm.pbrMetallicRoughness.baseColorTexture.texCoord, model.textures[index].source, model.textures[index].sampler, true };
+        }
 
         index = gm.pbrMetallicRoughness.metallicRoughnessTexture.index;
-        material.roughMetallicTA = { gm.pbrMetallicRoughness.metallicRoughnessTexture.texCoord, model.textures[index].source, model.textures[index].sampler, false };
+        if (index >= 0) {
+            material.roughMetallicTA = { gm.pbrMetallicRoughness.metallicRoughnessTexture.texCoord, model.textures[index].source, model.textures[index].sampler, false };
+        }
 
         index = gm.normalTexture.index;
-        material.normalTA = { gm.normalTexture.texCoord, model.textures[index].source, model.textures[index].sampler, false };
+        if (index >= 0) {
+            material.normalTA = { gm.normalTexture.texCoord, model.textures[index].source, model.textures[index].sampler, false };
+        }
 
         index = gm.emissiveTexture.index;
-        material.emissiveTA = { gm.emissiveTexture.texCoord, model.textures[index].source, model.textures[index].sampler, true };
+        if (index >= 0) {
+            material.emissiveTA = { gm.emissiveTexture.texCoord, model.textures[index].source, model.textures[index].sampler, true };
+        }
 
         index = gm.occlusionTexture.index;
-        material.occlusionTA = { gm.occlusionTexture.texCoord, model.textures[index].source, model.textures[index].sampler, false };
+        if (index >= 0) {
+            material.occlusionTA = { gm.occlusionTexture.texCoord, model.textures[index].source, model.textures[index].sampler, false };
+        }
 
         arrays.materials.push_back(material);
     }
@@ -765,7 +908,235 @@ HRESULT SceneManager::CreateNodes(const tinygltf::Model& model, SceneArrays& arr
     return result;
 }
 
-bool SceneManager::CreateShadowMaps(const DirectionalLight& dirLight, const std::vector<int>& sceneIndices) {
+bool SceneManager::CreateShadowMaps(const std::vector<int>& sceneIndices) {
+    if (!IsInit()) {
+        return false;
+    }
+
+    for (UINT i = 0; i < CSM_SPLIT_COUNT; ++i) {
+        device_->GetDeviceContext()->ClearDepthStencilView(shadowDSViews_[i], D3D11_CLEAR_DEPTH, 1.0f, 0);
+        device_->GetDeviceContext()->OMSetRenderTargets(1, nullptr, shadowDSViews_[i]);
+        device_->GetDeviceContext()->OMSetDepthStencilState(shadowDepthStencilState_.get(), 0);
+        device_->GetDeviceContext()->RSSetViewports(1, &shadowMapViewport_);
+        device_->GetDeviceContext()->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+
+        ShadowMapViewMatrixBuffer viewMatrix;
+        viewMatrix.viewProjectionMatrix = directionalLight_->viewProjectionMatrices[i];
+        device_->GetDeviceContext()->UpdateSubresource(shadowMapViewMatrixBuffer_, 0, nullptr, &viewMatrix, 0, 0);
+
+        for (auto j : sceneIndices) {
+            if (j < 0 || j >= scenes_.size()) {
+                continue;
+            }
+            for (auto node : scenes_[j].rootNodes) {
+                CreateShadowMapForNode(scenes_[j].arraysId, node, scenes_[j].transformation);
+            }
+        }
+    }
+    return true;
+}
+
+void SceneManager::CreateShadowMapForNode(int arrayId, int nodeId, const XMMATRIX& transformation) {
+    const Node& node = sceneArrays_[arrayId].nodes[nodeId];
+    const Mesh& mesh = sceneArrays_[arrayId].meshes[node.meshId];
+    XMMATRIX currentTransformation = XMMatrixMultiply(transformation, node.transformation);
+
+    for (auto& p : mesh.opaquePrimitives) {
+        CreateShadowMapForPrimitive(arrayId, p, OPAQUE_MODE, currentTransformation);
+    }
+    for (auto& p : mesh.transparentPrimitives) {
+        CreateShadowMapForPrimitive(arrayId, p, ALPHA_CUTOFF_MODE, currentTransformation);
+    }
+    for (auto& p : mesh.primitivesWithAlphaCutoff) {
+        CreateShadowMapForPrimitive(arrayId, p, ALPHA_CUTOFF_MODE, currentTransformation);
+    }
+
+    for (auto c : node.children) {
+        CreateShadowMapForNode(arrayId, c, currentTransformation);
+    }
+}
+
+void SceneManager::CreateShadowMapForPrimitive(int arrayId, const Primitive& primitive, AlphaMode mode, const XMMATRIX& transformation) {
+    const Material& material = sceneArrays_[arrayId].materials[primitive.materialId];
+
+    WorldMatrixBuffer worldMatrix;
+    worldMatrix.worldMatrix = transformation;
+    device_->GetDeviceContext()->UpdateSubresource(worldMatrixBuffer_, 0, nullptr, &worldMatrix, 0, 0);
+
+    if (mode == ALPHA_CUTOFF_MODE) {
+        ShadowMapAlphaCutoffBuffer alphaCutoff;
+        alphaCutoff.baseColorFactor = material.baseColorFactor;
+        alphaCutoff.alphaCutoffTexCoord = XMFLOAT4(material.alphaCutoff, material.baseColorTA.texCoordId, 0.0f, 0.0f);
+        device_->GetDeviceContext()->UpdateSubresource(shadowMapAlphaCutoffBuffer_, 0, nullptr, &alphaCutoff, 0, 0);
+
+        if (material.baseColorTA.textureId >= 0) {
+            ID3D11ShaderResourceView* resources[] = { sceneArrays_[arrayId].textures[material.baseColorTA.textureId]->GetSRV(material.baseColorTA.isSRGB).get() };
+            device_->GetDeviceContext()->PSSetShaderResources(0, 1, resources);
+
+            ID3D11SamplerState* samplers[] = { sceneArrays_[arrayId].samplers[material.baseColorTA.samplerId].get() };
+            device_->GetDeviceContext()->PSSetSamplers(0, 1, samplers);
+        }
+    }
+
+    device_->GetDeviceContext()->IASetInputLayout(primitive.shadowVS->GetInputLayout().get());
+    UINT numBuffers = primitive.attributes.size();
+    std::vector<ID3D11Buffer*> vertexBuffers;
+    std::vector<UINT> strides;
+    std::vector<UINT> offsets;
+    for (auto& a : primitive.attributes) {
+        const BufferAccessor& accessor = sceneArrays_[arrayId].accessors[a.verticesAccessorId];
+        vertexBuffers.push_back(accessor.buffer.get());
+        strides.push_back(accessor.byteStride);
+        offsets.push_back(accessor.byteOffset);
+    }
+    device_->GetDeviceContext()->IASetVertexBuffers(0, numBuffers, vertexBuffers.data(), strides.data(), offsets.data());
+    device_->GetDeviceContext()->RSSetState(material.rasterizerState.get());
+    device_->GetDeviceContext()->IASetPrimitiveTopology(primitive.mode);
+    device_->GetDeviceContext()->VSSetShader(primitive.shadowVS->GetShader().get(), nullptr, 0);
+    device_->GetDeviceContext()->VSSetConstantBuffers(0, 1, &worldMatrixBuffer_);
+    device_->GetDeviceContext()->VSSetConstantBuffers(1, 1, &shadowMapViewMatrixBuffer_);
+
+    if (mode == ALPHA_CUTOFF_MODE) {
+        device_->GetDeviceContext()->PSSetShader(primitive.shadowPS->GetShader().get(), nullptr, 0);
+        device_->GetDeviceContext()->PSSetConstantBuffers(0, 1, &shadowMapAlphaCutoffBuffer_);
+    }
+    else {
+        device_->GetDeviceContext()->PSSetShader(nullptr, nullptr, 0);
+    }
+
+    if (primitive.indicesAccessorId >= 0) {
+        const BufferAccessor& accessor = sceneArrays_[arrayId].accessors[primitive.indicesAccessorId];
+        device_->GetDeviceContext()->IASetIndexBuffer(accessor.buffer.get(), accessor.format, accessor.byteOffset);
+        device_->GetDeviceContext()->DrawIndexed(accessor.count, 0, 0);
+    }
+    else {
+        device_->GetDeviceContext()->Draw(sceneArrays_[arrayId].accessors[primitive.attributes[0].verticesAccessorId].count, 0);
+    }
+}
+
+bool SceneManager::PrepareTransparent(const std::vector<int>& sceneIndices) {
+    if (!IsInit()) {
+        return false;
+    }
+
+    transparentPrimitives_.clear();
+
+    ShadowMapViewMatrixBuffer viewMatrix;
+    viewMatrix.viewProjectionMatrix = camera_->GetViewProjectionMatrix();
+    device_->GetDeviceContext()->UpdateSubresource(shadowMapViewMatrixBuffer_, 0, nullptr, &viewMatrix, 0, 0);
+
+    for (auto j : sceneIndices) {
+        if (j < 0 || j >= scenes_.size()) {
+            continue;
+        }
+        for (auto node : scenes_[j].rootNodes) {
+            if (!PrepareTransparentForNode(scenes_[j].arraysId, node, scenes_[j].transformation)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+bool SceneManager::PrepareTransparentForNode(int arrayId, int nodeId, const XMMATRIX& transformation) {
+    const Node& node = sceneArrays_[arrayId].nodes[nodeId];
+    XMMATRIX currentTransformation = XMMatrixMultiply(transformation, node.transformation);
+
+    for (auto& p : sceneArrays_[arrayId].meshes[node.meshId].transparentPrimitives) {
+        if (!AddPrimitiveToTransparentPrimitives(arrayId, p, currentTransformation)) {
+            return false;
+        }
+    }
+
+    for (auto c : node.children) {
+        if (!PrepareTransparentForNode(arrayId, c, currentTransformation)) {
+            return false;
+        }
+    }
+}
+
+bool SceneManager::AddPrimitiveToTransparentPrimitives(int arrayId, const Primitive& primitive, const XMMATRIX& transformation) {
+    TransparentPrimitive transparentPrimitive(primitive);
+    transparentPrimitive.transformation = transformation;
+    transparentPrimitive.arrayId = arrayId;
+
+    device_->GetDeviceContext()->ClearDepthStencilView(transparentDSViews_, D3D11_CLEAR_DEPTH, 0.0f, 0);
+    device_->GetDeviceContext()->OMSetRenderTargets(1, nullptr, transparentDSViews_);
+    device_->GetDeviceContext()->OMSetDepthStencilState(transparentDepthStencilState_.get(), 0);
+    device_->GetDeviceContext()->RSSetViewports(1, &transparentViewport_);
+    device_->GetDeviceContext()->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+
+    WorldMatrixBuffer worldMatrix;
+    worldMatrix.worldMatrix = transformation;
+    device_->GetDeviceContext()->UpdateSubresource(worldMatrixBuffer_, 0, nullptr, &worldMatrix, 0, 0);
+
+    device_->GetDeviceContext()->IASetInputLayout(primitive.shadowVS->GetInputLayout().get());
+    UINT numBuffers = primitive.attributes.size();
+    std::vector<ID3D11Buffer*> vertexBuffers;
+    std::vector<UINT> strides;
+    std::vector<UINT> offsets;
+    for (auto& a : primitive.attributes) {
+        const BufferAccessor& accessor = sceneArrays_[arrayId].accessors[a.verticesAccessorId];
+        vertexBuffers.push_back(accessor.buffer.get());
+        strides.push_back(accessor.byteStride);
+        offsets.push_back(accessor.byteOffset);
+    }
+    device_->GetDeviceContext()->IASetVertexBuffers(0, numBuffers, vertexBuffers.data(), strides.data(), offsets.data());
+    device_->GetDeviceContext()->RSSetState(sceneArrays_[arrayId].materials[primitive.materialId].rasterizerState.get());
+    device_->GetDeviceContext()->IASetPrimitiveTopology(primitive.mode);
+    device_->GetDeviceContext()->VSSetShader(primitive.shadowVS->GetShader().get(), nullptr, 0);
+    device_->GetDeviceContext()->VSSetConstantBuffers(0, 1, &worldMatrixBuffer_);
+    device_->GetDeviceContext()->VSSetConstantBuffers(1, 1, &shadowMapViewMatrixBuffer_);
+    device_->GetDeviceContext()->PSSetShader(nullptr, nullptr, 0);
+    if (primitive.indicesAccessorId >= 0) {
+        const BufferAccessor& accessor = sceneArrays_[arrayId].accessors[primitive.indicesAccessorId];
+        device_->GetDeviceContext()->IASetIndexBuffer(accessor.buffer.get(), accessor.format, accessor.byteOffset);
+        device_->GetDeviceContext()->DrawIndexed(accessor.count, 0, 0);
+    }
+    else {
+        device_->GetDeviceContext()->Draw(sceneArrays_[arrayId].accessors[primitive.attributes[0].verticesAccessorId].count, 0);
+    }
+
+    static float color[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
+    for (int i = n; i >= 0; --i) {
+        ID3D11RenderTargetView* views[] = { scaledFrames_[i].RTV };
+        device_->GetDeviceContext()->OMSetRenderTargets(1, views, nullptr);
+        device_->GetDeviceContext()->ClearRenderTargetView(scaledFrames_[i].RTV, color);
+
+        ID3D11SamplerState* samplers[] = { samplerMax_.get() };
+        device_->GetDeviceContext()->PSSetSamplers(0, 1, samplers);
+
+        downsampleViewport_.Width = pow(2, i);
+        downsampleViewport_.Height = pow(2, i);
+        device_->GetDeviceContext()->RSSetViewports(1, &downsampleViewport_);
+
+        ID3D11ShaderResourceView* resources[] = { i == n ? transparentSRViews_ : scaledFrames_[i + 1].SRV };
+        device_->GetDeviceContext()->PSSetShaderResources(0, 1, resources);
+        device_->GetDeviceContext()->RSSetState(nullptr);
+        device_->GetDeviceContext()->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+        device_->GetDeviceContext()->IASetInputLayout(nullptr);
+        device_->GetDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        device_->GetDeviceContext()->VSSetShader(mappingVS_->GetShader().get(), nullptr, 0);
+        device_->GetDeviceContext()->PSSetShader(downsamplePS_->GetShader().get(), nullptr, 0);
+        device_->GetDeviceContext()->Draw(6, 0);
+    }
+
+    device_->GetDeviceContext()->CopyResource(readMaxTexture_, scaledFrames_[0].texture);
+    D3D11_MAPPED_SUBRESOURCE ResourceDesc = {};
+    HRESULT result = device_->GetDeviceContext()->Map(readMaxTexture_, 0, D3D11_MAP_READ, 0, &ResourceDesc);
+    if (FAILED(result)) {
+        return false;
+    }
+
+    if (ResourceDesc.pData) {
+        float* pData = reinterpret_cast<float*>(ResourceDesc.pData);
+        transparentPrimitive.distance = pData[0];
+    }
+    device_->GetDeviceContext()->Unmap(readMaxTexture_, 0);
+
+    transparentPrimitives_.push_back(transparentPrimitive);
+
     return true;
 }
 
@@ -775,45 +1146,266 @@ bool SceneManager::Render(
     const std::shared_ptr<ID3D11ShaderResourceView>& BRDF,
     const std::shared_ptr<Skybox>& skybox,
     const std::vector<SpotLight>& lights,
-    const DirectionalLight& dirLight,
     const std::vector<int>& sceneIndices
 ) {
+    if (!IsInit()) {
+        return false;
+    }
+
+    XMFLOAT3 cameraPos = camera_->GetPosition();
+    D3D11_MAPPED_SUBRESOURCE subresource;
+    HRESULT result = device_->GetDeviceContext()->Map(viewMatrixBuffer_, 0, D3D11_MAP_WRITE_DISCARD, 0, &subresource);
+    if (FAILED(result)) {
+        return false;
+    }
+
+    ViewMatrixBuffer& sceneBuffer = *reinterpret_cast<ViewMatrixBuffer*>(subresource.pData);
+    sceneBuffer.viewProjectionMatrix = camera_->GetViewProjectionMatrix();
+    sceneBuffer.cameraPos = XMFLOAT4(cameraPos.x, cameraPos.y, cameraPos.z, 1.0f);
+    sceneBuffer.lightParams = XMINT4(int(lights.size()), 0, 0, 0);
+    for (int i = 0; i < lights.size() && i < MAX_LIGHT; ++i) {
+        sceneBuffer.lights[i].pos = lights[i].pos;
+        sceneBuffer.lights[i].color = lights[i].color;
+    }
+    sceneBuffer.directionalLight = directionalLight_->GetInfo();
+    device_->GetDeviceContext()->Unmap(viewMatrixBuffer_, 0);
+
+    for (auto j : sceneIndices) {
+        if (j < 0 || j >= scenes_.size()) {
+            continue;
+        }
+        for (auto node : scenes_[j].rootNodes) {
+            RenderNode(scenes_[j].arraysId, node, irradianceMap, prefilteredMap, BRDF, scenes_[j].transformation);
+        }
+    }
+
+    if (!skybox->Render()) {
+        return false;
+    }
+
+    RenderTransparent(irradianceMap, prefilteredMap, BRDF);
+
     return true;
 }
 
-bool SceneManager::RenderTransparent(
+void SceneManager::RenderNode(
+    int arrayId,
+    int nodeId,
     const std::shared_ptr<ID3D11ShaderResourceView>& irradianceMap,
     const std::shared_ptr<ID3D11ShaderResourceView>& prefilteredMap,
     const std::shared_ptr<ID3D11ShaderResourceView>& BRDF,
-    const std::vector<SpotLight>& lights,
-    const DirectionalLight& dirLight,
-    const std::vector<int>& sceneIndices
+    const XMMATRIX& transformation
 ) {
-    return true;
+    const Node& node = sceneArrays_[arrayId].nodes[nodeId];
+    const Mesh& mesh = sceneArrays_[arrayId].meshes[node.meshId];
+    XMMATRIX currentTransformation = XMMatrixMultiply(transformation, node.transformation);
+
+    for (auto& p : mesh.opaquePrimitives) {
+        RenderPrimitive(arrayId, p, irradianceMap, prefilteredMap, BRDF, currentTransformation);
+    }
+    for (auto& p : mesh.primitivesWithAlphaCutoff) {
+        RenderPrimitive(arrayId, p, irradianceMap, prefilteredMap, BRDF, currentTransformation);
+    }
+
+    for (auto c : node.children) {
+        RenderNode(arrayId, c, irradianceMap, prefilteredMap, BRDF, currentTransformation);
+    }
+}
+
+void SceneManager::RenderPrimitive(
+    int arrayId,
+    const Primitive& primitive,
+    const std::shared_ptr<ID3D11ShaderResourceView>& irradianceMap,
+    const std::shared_ptr<ID3D11ShaderResourceView>& prefilteredMap,
+    const std::shared_ptr<ID3D11ShaderResourceView>& BRDF,
+    const XMMATRIX& transformation
+) {
+    const Material& material = sceneArrays_[arrayId].materials[primitive.materialId];
+
+    WorldMatrixBuffer worldMatrix;
+    worldMatrix.worldMatrix = transformation;
+    device_->GetDeviceContext()->UpdateSubresource(worldMatrixBuffer_, 0, nullptr, &worldMatrix, 0, 0);
+
+    MaterialParamsBuffer materialBuffer;
+    materialBuffer.baseColorFactor = material.baseColorFactor;
+    materialBuffer.baseColorTA = XMINT4(material.baseColorTA.textureId, material.baseColorTA.texCoordId, material.baseColorTA.samplerId, material.baseColorTA.isSRGB);
+    materialBuffer.emissiveFactorAlphaCutoff = XMFLOAT4(material.emissiveFactor.x, material.emissiveFactor.y, material.emissiveFactor.z, material.alphaCutoff);
+    materialBuffer.emissiveTA = XMINT4(material.emissiveTA.textureId, material.emissiveTA.texCoordId, material.emissiveTA.samplerId, material.emissiveTA.isSRGB);
+    materialBuffer.MRONFactors = XMFLOAT4(material.metallicFactor, material.roughnessFactor, material.occlusionStrength, material.normalScale);
+    materialBuffer.normalTA = XMINT4(material.normalTA.textureId, material.normalTA.texCoordId, material.normalTA.samplerId, material.normalTA.isSRGB);
+    materialBuffer.roughMetallicTA = XMINT4(material.roughMetallicTA.textureId, material.roughMetallicTA.texCoordId, material.roughMetallicTA.samplerId,
+        material.roughMetallicTA.isSRGB);
+    materialBuffer.occlusionTA = XMINT4(material.occlusionTA.textureId, material.occlusionTA.texCoordId, material.occlusionTA.samplerId, material.occlusionTA.isSRGB);
+    device_->GetDeviceContext()->UpdateSubresource(materialParamsBuffer_, 0, nullptr, &materialBuffer, 0, 0);
+
+    std::vector<ID3D11SamplerState*> samplers = { };
+    if (currentMode_ == DEFAULT) {
+        samplers.push_back(samplerAvg_.get());
+        samplers.push_back(samplerPCF_.get());
+    }
+    for (auto& s : sceneArrays_[arrayId].samplers) {
+        samplers.push_back(s.get());
+    }
+    device_->GetDeviceContext()->PSSetSamplers(currentMode_ == DEFAULT ? 0 : 2, samplers.size(), samplers.data());
+
+    std::vector<ID3D11ShaderResourceView*> resources = { };
+    if (currentMode_ == DEFAULT) {
+        resources.push_back(irradianceMap.get());
+        resources.push_back(prefilteredMap.get());
+        resources.push_back(BRDF.get());
+        for (UINT i = 0; i < CSM_SPLIT_COUNT; ++i) {
+            resources.push_back(shadowSRViews_[i]);
+        }
+    }
+    for (auto& t : sceneArrays_[arrayId].textures) { // index = textureId * 2 + (isSRGB ? 1 : 0)
+        resources.push_back(t->GetSRV().get());
+        resources.push_back(t->GetSRV(true).get());
+    }
+    device_->GetDeviceContext()->PSSetShaderResources(currentMode_ == DEFAULT ? 0 : 3 + CSM_SPLIT_COUNT, resources.size(), resources.data());
+
+    device_->GetDeviceContext()->OMSetDepthStencilState(material.depthStencilState.get(), 0);
+    device_->GetDeviceContext()->RSSetState(material.rasterizerState.get());
+
+    device_->GetDeviceContext()->IASetInputLayout(primitive.VS->GetInputLayout().get());
+    UINT numBuffers = primitive.attributes.size();
+    std::vector<ID3D11Buffer*> vertexBuffers;
+    std::vector<UINT> strides;
+    std::vector<UINT> offsets;
+    for (auto& a : primitive.attributes) {
+        const BufferAccessor& accessor = sceneArrays_[arrayId].accessors[a.verticesAccessorId];
+        vertexBuffers.push_back(accessor.buffer.get());
+        strides.push_back(accessor.byteStride);
+        offsets.push_back(accessor.byteOffset);
+    }
+    device_->GetDeviceContext()->IASetVertexBuffers(0, numBuffers, vertexBuffers.data(), strides.data(), offsets.data());
+    device_->GetDeviceContext()->IASetPrimitiveTopology(primitive.mode);
+    device_->GetDeviceContext()->VSSetShader(primitive.VS->GetShader().get(), nullptr, 0);
+    device_->GetDeviceContext()->VSSetConstantBuffers(0, 1, &worldMatrixBuffer_);
+    device_->GetDeviceContext()->VSSetConstantBuffers(1, 1, &viewMatrixBuffer_);
+    switch (currentMode_) {
+    case FRESNEL:
+        device_->GetDeviceContext()->PSSetShader(primitive.PSFresnel->GetShader().get(), nullptr, 0);
+        break;
+    case NDF:
+        device_->GetDeviceContext()->PSSetShader(primitive.PSNdf->GetShader().get(), nullptr, 0);
+        break;
+    case GEOMETRY:
+        device_->GetDeviceContext()->PSSetShader(primitive.PSGeometry->GetShader().get(), nullptr, 0);
+        break;
+    default:
+        device_->GetDeviceContext()->PSSetShader(primitive.PSDefault->GetShader().get(), nullptr, 0);
+        break;
+    }
+    device_->GetDeviceContext()->PSSetConstantBuffers(0, 1, &materialParamsBuffer_);
+    device_->GetDeviceContext()->PSSetConstantBuffers(1, 1, &viewMatrixBuffer_);
+
+    if (primitive.indicesAccessorId >= 0) {
+        const BufferAccessor& accessor = sceneArrays_[arrayId].accessors[primitive.indicesAccessorId];
+        device_->GetDeviceContext()->IASetIndexBuffer(accessor.buffer.get(), accessor.format, accessor.byteOffset);
+        device_->GetDeviceContext()->DrawIndexed(accessor.count, 0, 0);
+    }
+    else {
+        device_->GetDeviceContext()->Draw(sceneArrays_[arrayId].accessors[primitive.attributes[0].verticesAccessorId].count, 0);
+    }
+}
+
+void SceneManager::RenderTransparent(
+    const std::shared_ptr<ID3D11ShaderResourceView>& irradianceMap,
+    const std::shared_ptr<ID3D11ShaderResourceView>& prefilteredMap,
+    const std::shared_ptr<ID3D11ShaderResourceView>& BRDF
+) {
+    if (transparentPrimitives_.empty()) {
+        return;
+    }
+
+    std::sort(transparentPrimitives_.begin(), transparentPrimitives_.end());
+
+    for (auto& tp : transparentPrimitives_) {
+        RenderPrimitive(tp.arrayId, tp.primitive, irradianceMap, prefilteredMap, BRDF, tp.transformation);
+    }
 }
 
 void SceneManager::SetMode(Mode mode) {
     currentMode_ = mode;
 }
 
+bool SceneManager::Resize(int width, int height) {
+    if (!IsInit()) {
+        return false;
+    }
+
+    n = 0;
+    int minSide = min(width, height);
+    while (minSide >>= 1) {
+        n++;
+    }
+
+    SAFE_RELEASE(transparentDepthBuffer_);
+    SAFE_RELEASE(transparentDSViews_);
+    SAFE_RELEASE(transparentSRViews_);
+
+    for (int i = 0; i < scaledFrames_.size(); ++i) {
+        SAFE_RELEASE(scaledFrames_[i].texture);
+        SAFE_RELEASE(scaledFrames_[i].SRV);
+        SAFE_RELEASE(scaledFrames_[i].RTV);
+    }
+    scaledFrames_.clear();
+
+    transparentViewport_.Width = width;
+    transparentViewport_.Height = height;
+
+    HRESULT result = CreateDepthStencilView(width, height, transparentDepthBuffer_, transparentDSViews_, transparentSRViews_);
+    for (int i = 0; i < n + 1 && SUCCEEDED(result); ++i) {
+        RawPtrTexture texture;
+        result = CreateTexture(texture, i);
+        if (SUCCEEDED(result)) {
+            scaledFrames_.push_back(texture);
+        }
+    }
+
+    return SUCCEEDED(result);
+}
+
 bool SceneManager::IsInit() const {
-    return !!materialParamsBuffer_;
+    return !!shadowMapAlphaCutoffBuffer_;
 }
 
 void SceneManager::Cleanup() {
     device_.reset();
     managerStorage_.reset();
     camera_.reset();
+    directionalLight_.reset();
+    samplerAvg_.reset();
+    shadowDepthStencilState_.reset();
+    samplerPCF_.reset();
+    mappingVS_.reset();
+    downsamplePS_.reset();
+    transparentDepthStencilState_.reset();
+    samplerMax_.reset();
 
     SAFE_RELEASE(worldMatrixBuffer_);
     SAFE_RELEASE(viewMatrixBuffer_);
     SAFE_RELEASE(materialParamsBuffer_);
+    SAFE_RELEASE(shadowMapViewMatrixBuffer_);
+    SAFE_RELEASE(shadowMapAlphaCutoffBuffer_);
 
     for (UINT i = 0; i < CSM_SPLIT_COUNT; ++i) {
         SAFE_RELEASE(shadowBuffers_[i]);
         SAFE_RELEASE(shadowDSViews_[i]);
         SAFE_RELEASE(shadowSRViews_[i]);
     }
+
+    SAFE_RELEASE(readMaxTexture_);
+    SAFE_RELEASE(transparentDepthBuffer_);
+    SAFE_RELEASE(transparentDSViews_);
+    SAFE_RELEASE(transparentSRViews_);
+
+    for (int i = 0; i < scaledFrames_.size(); ++i) {
+        SAFE_RELEASE(scaledFrames_[i].texture);
+        SAFE_RELEASE(scaledFrames_[i].SRV);
+        SAFE_RELEASE(scaledFrames_[i].RTV);
+    }
+    scaledFrames_.clear();
 
     scenes_.clear();
     sceneArrays_.clear();

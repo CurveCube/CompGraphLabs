@@ -19,6 +19,7 @@ cbuffer adaptBuffer : register (b0) {
     float4 adapt;
 };
 
+
 static const float A = 0.1f;
 static const float B = 0.50f;
 static const float C = 0.1f;
@@ -40,6 +41,7 @@ float3 TonemapFilmic(float3 color, float adaptedAvg, float Efactor) {
     float3 whiteScale = 1.0f / Uncharted2Tonemap(W);
     return curr * whiteScale;
 }
+
 
 PS_OUTPUT main(PS_INPUT input) : SV_TARGET{
     PS_OUTPUT output;

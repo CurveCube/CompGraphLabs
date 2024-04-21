@@ -1,8 +1,10 @@
-#include "shaders/SceneMatrixBuffer.hlsli"
-
 cbuffer WorldMatrixBuffer : register (b0) {
     float4x4 worldMatrix;
 };
+
+cbuffer ViewMatrixBuffer : register (b1) {
+    float4x4 viewProjectionMatrix;
+}
 
 struct VS_INPUT {
     float3 position : POSITION;
@@ -32,11 +34,6 @@ struct VS_INPUT {
 
 struct PS_INPUT {
     float4 position : SV_POSITION;
-    float4 worldPos : POSITION;
-    float3 normal : NORMAL;
-#ifdef HAS_TANGENT
-    float4 tangent : TANGENT;
-#endif
 #ifdef HAS_TEXCOORD_0
     float2 texCoord0 : TEXCOORD_0;
 #endif
@@ -60,12 +57,8 @@ struct PS_INPUT {
 PS_INPUT main(VS_INPUT input) {
     PS_INPUT output;
 
-    output.worldPos = mul(worldMatrix, float4(input.position, 1.0f));
-    output.position = mul(viewProjectionMatrix, output.worldPos);
-    output.normal = mul(worldMatrix, input.normal);
-#ifdef HAS_TANGENT
-    output.tangent = input.tangent;
-#endif
+    float4 worldPos = mul(worldMatrix, float4(input.position, 1.0f));
+    output.position = mul(viewProjectionMatrix, worldPos);
 #ifdef HAS_TEXCOORD_0
     output.texCoord0 = input.texCoord0;
 #endif
