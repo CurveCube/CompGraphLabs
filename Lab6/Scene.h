@@ -9,7 +9,7 @@
 
 class SceneManager {
     struct Node {
-        UINT meshId = 0;
+        int meshId = 0;
         std::vector<int> children;
         XMMATRIX transformation = XMMatrixIdentity();
     };
@@ -23,12 +23,8 @@ class SceneManager {
     };
 
     struct Attribute {
-        std::string semantic = "POSITION";
-        UINT verticesAccessorId = 0;
-
-        friend bool operator<(const Attribute& a1, const Attribute& a2) {
-            return a1.semantic < a2.semantic;
-        };
+        std::string semantic = "EMPTY";
+        int verticesAccessorId = 0;
     };
 
     struct Primitive {
@@ -101,7 +97,7 @@ class SceneManager {
     struct Scene {
         std::vector<int> rootNodes;
         XMMATRIX transformation = XMMatrixIdentity();
-        UINT arraysId = 0;
+        int arraysId = 0;
     };
 
     struct SceneArrays {
@@ -184,7 +180,7 @@ public:
     };
 
 private:
-    HRESULT CreateDepthStencilView(int width, int height, ID3D11Texture2D* buffer, ID3D11DepthStencilView* DSV, ID3D11ShaderResourceView* SRV);
+    HRESULT CreateDepthStencilView(int width, int height, ID3D11Texture2D** buffer, ID3D11DepthStencilView** DSV, ID3D11ShaderResourceView** SRV);
     HRESULT CreateAuxiliaryForTransparent(int width, int height);
     HRESULT CreateTexture(RawPtrTexture& texture, int i);
     HRESULT CreateBuffers();

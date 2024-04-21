@@ -13,19 +13,19 @@ struct VS_INPUT {
     float4 tangent : TANGENT;
 #endif
 #ifdef HAS_TEXCOORD_0
-    float2 texCoord0 : TEXCOORD_0;
+    float2 texCoord0 : TEXCOORD0;
 #endif
 #ifdef HAS_TEXCOORD_1
-    float2 texCoord1 : TEXCOORD_1;
+    float2 texCoord1 : TEXCOORD1;
 #endif
 #ifdef HAS_TEXCOORD_2
-    float2 texCoord2 : TEXCOORD_2;
+    float2 texCoord2 : TEXCOORD2;
 #endif
 #ifdef HAS_TEXCOORD_3
-    float2 texCoord3 : TEXCOORD_3;
+    float2 texCoord3 : TEXCOORD3;
 #endif
 #ifdef HAS_TEXCOORD_4
-    float2 texCoord4 : TEXCOORD_4;
+    float2 texCoord4 : TEXCOORD4;
 #endif
 #ifdef HAS_COLOR
     float4 color : COLOR;
@@ -35,19 +35,19 @@ struct VS_INPUT {
 struct PS_INPUT {
     float4 position : SV_POSITION;
 #ifdef HAS_TEXCOORD_0
-    float2 texCoord0 : TEXCOORD_0;
+    float2 texCoord0 : TEXCOORD0;
 #endif
 #ifdef HAS_TEXCOORD_1
-    float2 texCoord1 : TEXCOORD_1;
+    float2 texCoord1 : TEXCOORD1;
 #endif
 #ifdef HAS_TEXCOORD_2
-    float2 texCoord2 : TEXCOORD_2;
+    float2 texCoord2 : TEXCOORD2;
 #endif
 #ifdef HAS_TEXCOORD_3
-    float2 texCoord3 : TEXCOORD_3;
+    float2 texCoord3 : TEXCOORD3;
 #endif
 #ifdef HAS_TEXCOORD_4
-    float2 texCoord4 : TEXCOORD_4;
+    float2 texCoord4 : TEXCOORD4;
 #endif
 #ifdef HAS_COLOR
     float4 color : COLOR;

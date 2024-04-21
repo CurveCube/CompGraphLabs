@@ -44,7 +44,7 @@ bool Renderer::Init(HINSTANCE hInstance, HWND hWnd) {
     }
     if (SUCCEEDED(result)) {
         camera_ = std::shared_ptr<Camera>(new Camera(XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 3.0f, 3.0f), XM_PI / 3, width_,
-            height_, 0.01f, 100.0f));
+            height_, 0.01f, 1000.0f));
         dirLight_ = std::make_shared<DirectionalLight>();
     }
     if (SUCCEEDED(result)) {
@@ -57,7 +57,7 @@ bool Renderer::Init(HINSTANCE hInstance, HWND hWnd) {
     if (SUCCEEDED(result)) {
         UINT index = 0;
         UINT count = 0;
-        result = sceneManager_.LoadScene("models/scene/untitled.gltf", index, count);
+        result = sceneManager_.LoadScene("models/statue/scene.gltf", index, count);
         if (SUCCEEDED(result) && (index != 0 || count != 1)) {
             result = E_FAIL;
         }

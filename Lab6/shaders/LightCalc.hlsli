@@ -1,11 +1,13 @@
 #include "shaders/SceneMatrixBuffer.hlsli"
 
+#ifdef DEFAULT
 TextureCube irradianceTexture : register (t0);
 TextureCube prefilteredTexture : register (t1);
 Texture2D brdfTexture : register (t2);
 SamplerState samplerAvg : register (s0);
 Texture2D shadowMaps[4] : register (t3);
 SamplerComparisonState samplerPcf : register (s1);
+#endif
 
 static float PI = 3.14159265359f;
 
@@ -39,30 +41,40 @@ float geometrySmith(in float3 n, in float3 v, in float3 l, in float roughness) {
     return geometrySchlickGGX(max(dot(n, v), 0.0f), roughness) * geometrySchlickGGX(max(dot(n, l), 0.0f), roughness);
 }
 
+#ifdef DEFAULT
 float shadowFactor(in float3 pos) {
-    float4 lightProjPos = float4(pos, 1.0f) * directionalLight.viewProjectionMatrix;
+    float4 lightProjPos = mul(directionalLight.viewProjectionMatrix, float4(pos, 1.0f));
     float4x4 M_uv = float4x4(0.5f, 0, 0, 0, 0, -0.5f, 0, 0, 0, 0, 1.0f, 0, 0.5f, 0.5f, 0, 1.0f);
     int i = 0;
-    while (lightProjPos.x > 1.0f || lightProjPos.x < -1.0f || lightProjPos.y > 1.0f || lightProjPos.y < -1.0f) {
-        if (i == 3) {
-            break;
-        }
+    while ((lightProjPos.x > 1.0f || lightProjPos.x < -1.0f || lightProjPos.y > 1.0f || lightProjPos.y < -1.0f) && i < 3) {
         ++i;
         lightProjPos.xy = lightProjPos.xy * directionalLight.splitSizeRatio[0] / directionalLight.splitSizeRatio[i];
     }
-    lightProjPos = lightProjPos * M_uv;
-    return shadowMaps[i].SampleCmp(samplerPcf, lightProjPos.xyz);
+    lightProjPos = mul(M_uv, lightProjPos);
+    if (i == 0) {
+        return shadowMaps[0].SampleCmp(samplerPcf, lightProjPos.xy, lightProjPos.z);
+    }
+    else if (i == 1) {
+        return shadowMaps[1].SampleCmp(samplerPcf, lightProjPos.xy, lightProjPos.z);
+    }
+    else if (i == 2) {
+        return shadowMaps[2].SampleCmp(samplerPcf, lightProjPos.xy, lightProjPos.z);
+    }
+    else {
+        return shadowMaps[3].SampleCmp(samplerPcf, lightProjPos.xy, lightProjPos.z);
+    }
 }
+#endif
 
-float3 CalculateColor(in float3 objColor, in float3 objNormal, in float3 pos, in float roughness, in float metallic, , in float occlusionFactor) {
+float3 CalculateColor(in float3 objColor, in float3 objNormal, in float3 pos, in float roughness, in float metallic, in float occlusionFactor) {
     float3 viewDir = normalize(cameraPos.xyz - pos);
     float3 finalColor = float3(0.0f, 0.0f, 0.0f);
 #if defined(DEFAULT)
     float3 R = reflect(-viewDir, objNormal);
     static const float MAX_REFLECTION_LOD = 4.0f;
-    float3 prefilteredColor = prefilteredTexture.SampleLevel(samplerAvg, R, roughness * MAX_REFLECTION_LOD);
+    float3 prefilteredColor = prefilteredTexture.SampleLevel(samplerAvg, R, roughness * MAX_REFLECTION_LOD).xyz;
     float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), objColor.xyz, metallic);
-    float2 envBRDF = brdfTexture.Sample(samplerAvg, float2(max(dot(objNormal, viewDir), 0.0f), roughness));
+    float2 envBRDF = brdfTexture.Sample(samplerAvg, float2(max(dot(objNormal, viewDir), 0.0f), roughness)).xy;
     float3 specular = prefilteredColor * (F0 * envBRDF.x + envBRDF.y);
 
     float3 FR = fresnelRoughnessFunction(objColor, objNormal, viewDir, metallic, roughness);
