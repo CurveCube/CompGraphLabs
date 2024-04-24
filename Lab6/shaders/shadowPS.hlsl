@@ -30,7 +30,7 @@ struct PS_INPUT {
 #endif
 };
 
-void main(PS_INPUT input) : SV_TARGET {
+void main(PS_INPUT input) {
     float4 color = baseColor;
 #ifdef HAS_COLOR
     color *= input.color;

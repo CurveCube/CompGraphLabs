@@ -300,10 +300,12 @@ HRESULT SceneManager::CreateBufferAccessors(const tinygltf::Model& model, SceneA
         BufferAccessor accessor;
         accessor.count = ga.count;
         accessor.byteOffset = ga.byteOffset;
-        accessor.format = GetFormat(ga);
+        accessor.format = GetFormat(ga, accessor.byteStride);
 
         const tinygltf::BufferView& gbv = model.bufferViews[ga.bufferView];
-        accessor.byteStride = gbv.byteStride;
+        if (gbv.byteStride != 0) {
+            accessor.byteStride = gbv.byteStride;
+        }
 
         D3D11_BUFFER_DESC desc = {};
         desc.ByteWidth = gbv.byteLength;
@@ -336,20 +338,20 @@ HRESULT SceneManager::CreateBufferAccessors(const tinygltf::Model& model, SceneA
     return result;
 }
 
-DXGI_FORMAT SceneManager::GetFormat(const tinygltf::Accessor& accessor) {
+DXGI_FORMAT SceneManager::GetFormat(const tinygltf::Accessor& accessor, UINT& size) {
     DXGI_FORMAT format = DXGI_FORMAT_R32G32B32A32_FLOAT;
     switch (accessor.type) {
     case TINYGLTF_TYPE_SCALAR:
-        format = GetFormatScalar(accessor);
+        format = GetFormatScalar(accessor, size);
         break;
     case TINYGLTF_TYPE_VEC2:
-        format = GetFormatVec2(accessor);
+        format = GetFormatVec2(accessor, size);
         break;
     case TINYGLTF_TYPE_VEC3:
-        format = GetFormatVec3(accessor);
+        format = GetFormatVec3(accessor, size);
         break;
     case TINYGLTF_TYPE_VEC4:
-        format = GetFormatVec4(accessor);
+        format = GetFormatVec4(accessor, size);
         break;
     default:
         break;
@@ -357,7 +359,7 @@ DXGI_FORMAT SceneManager::GetFormat(const tinygltf::Accessor& accessor) {
     return format;
 }
 
-DXGI_FORMAT SceneManager::GetFormatScalar(const tinygltf::Accessor& accessor) {
+DXGI_FORMAT SceneManager::GetFormatScalar(const tinygltf::Accessor& accessor, UINT& size) {
     DXGI_FORMAT format = DXGI_FORMAT_R32_FLOAT;
     switch (accessor.componentType) {
     case TINYGLTF_COMPONENT_TYPE_BYTE:
@@ -367,6 +369,7 @@ DXGI_FORMAT SceneManager::GetFormatScalar(const tinygltf::Accessor& accessor) {
         else {
             format = DXGI_FORMAT_R8_SINT;
         }
+        size = 1;
         break;
     case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
         if (accessor.normalized) {
@@ -375,6 +378,7 @@ DXGI_FORMAT SceneManager::GetFormatScalar(const tinygltf::Accessor& accessor) {
         else {
             format = DXGI_FORMAT_R8_UINT;
         }
+        size = 1;
         break;
     case TINYGLTF_COMPONENT_TYPE_SHORT:
         if (accessor.normalized) {
@@ -383,6 +387,7 @@ DXGI_FORMAT SceneManager::GetFormatScalar(const tinygltf::Accessor& accessor) {
         else {
             format = DXGI_FORMAT_R16_SINT;
         }
+        size = 2;
         break;
     case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
         if (accessor.normalized) {
@@ -391,12 +396,15 @@ DXGI_FORMAT SceneManager::GetFormatScalar(const tinygltf::Accessor& accessor) {
         else {
             format = DXGI_FORMAT_R16_UINT;
         }
+        size = 2;
         break;
     case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
         format = DXGI_FORMAT_R32_UINT;
+        size = 4;
         break;
     case TINYGLTF_COMPONENT_TYPE_FLOAT:
         format = DXGI_FORMAT_R32_FLOAT;
+        size = 4;
         break;
     default:
         break;
@@ -404,7 +412,7 @@ DXGI_FORMAT SceneManager::GetFormatScalar(const tinygltf::Accessor& accessor) {
     return format;
 }
 
-DXGI_FORMAT SceneManager::GetFormatVec2(const tinygltf::Accessor& accessor) {
+DXGI_FORMAT SceneManager::GetFormatVec2(const tinygltf::Accessor& accessor, UINT& size) {
     DXGI_FORMAT format = DXGI_FORMAT_R32G32_FLOAT;
     switch (accessor.componentType) {
     case TINYGLTF_COMPONENT_TYPE_BYTE:
@@ -414,6 +422,7 @@ DXGI_FORMAT SceneManager::GetFormatVec2(const tinygltf::Accessor& accessor) {
         else {
             format = DXGI_FORMAT_R8G8_SINT;
         }
+        size = 2;
         break;
     case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
         if (accessor.normalized) {
@@ -422,6 +431,7 @@ DXGI_FORMAT SceneManager::GetFormatVec2(const tinygltf::Accessor& accessor) {
         else {
             format = DXGI_FORMAT_R8G8_UINT;
         }
+        size = 2;
         break;
     case TINYGLTF_COMPONENT_TYPE_SHORT:
         if (accessor.normalized) {
@@ -430,6 +440,7 @@ DXGI_FORMAT SceneManager::GetFormatVec2(const tinygltf::Accessor& accessor) {
         else {
             format = DXGI_FORMAT_R16G16_SINT;
         }
+        size = 4;
         break;
     case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
         if (accessor.normalized) {
@@ -438,12 +449,15 @@ DXGI_FORMAT SceneManager::GetFormatVec2(const tinygltf::Accessor& accessor) {
         else {
             format = DXGI_FORMAT_R16G16_UINT;
         }
+        size = 4;
         break;
     case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
         format = DXGI_FORMAT_R32G32_UINT;
+        size = 8;
         break;
     case TINYGLTF_COMPONENT_TYPE_FLOAT:
         format = DXGI_FORMAT_R32G32_FLOAT;
+        size = 8;
         break;
     default:
         break;
@@ -451,14 +465,16 @@ DXGI_FORMAT SceneManager::GetFormatVec2(const tinygltf::Accessor& accessor) {
     return format;
 }
 
-DXGI_FORMAT SceneManager::GetFormatVec3(const tinygltf::Accessor& accessor) {
+DXGI_FORMAT SceneManager::GetFormatVec3(const tinygltf::Accessor& accessor, UINT& size) {
     DXGI_FORMAT format = DXGI_FORMAT_R32G32B32_FLOAT;
     switch (accessor.componentType) {
     case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
         format = DXGI_FORMAT_R32G32B32_UINT;
+        size = 12;
         break;
     case TINYGLTF_COMPONENT_TYPE_FLOAT:
         format = DXGI_FORMAT_R32G32B32_FLOAT;
+        size = 12;
         break;
     default:
         break;
@@ -466,7 +482,7 @@ DXGI_FORMAT SceneManager::GetFormatVec3(const tinygltf::Accessor& accessor) {
     return format;
 }
 
-DXGI_FORMAT SceneManager::GetFormatVec4(const tinygltf::Accessor& accessor) {
+DXGI_FORMAT SceneManager::GetFormatVec4(const tinygltf::Accessor& accessor, UINT& size) {
     DXGI_FORMAT format = DXGI_FORMAT_R32G32B32A32_FLOAT;
     switch (accessor.componentType) {
     case TINYGLTF_COMPONENT_TYPE_BYTE:
@@ -476,6 +492,7 @@ DXGI_FORMAT SceneManager::GetFormatVec4(const tinygltf::Accessor& accessor) {
         else {
             format = DXGI_FORMAT_R8G8B8A8_SINT;
         }
+        size = 4;
         break;
     case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
         if (accessor.normalized) {
@@ -484,6 +501,7 @@ DXGI_FORMAT SceneManager::GetFormatVec4(const tinygltf::Accessor& accessor) {
         else {
             format = DXGI_FORMAT_R8G8B8A8_UINT;
         }
+        size = 4;
         break;
     case TINYGLTF_COMPONENT_TYPE_SHORT:
         if (accessor.normalized) {
@@ -492,6 +510,7 @@ DXGI_FORMAT SceneManager::GetFormatVec4(const tinygltf::Accessor& accessor) {
         else {
             format = DXGI_FORMAT_R16G16B16A16_SINT;
         }
+        size = 8;
         break;
     case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
         if (accessor.normalized) {
@@ -500,12 +519,15 @@ DXGI_FORMAT SceneManager::GetFormatVec4(const tinygltf::Accessor& accessor) {
         else {
             format = DXGI_FORMAT_R16G16B16A16_UINT;
         }
+        size = 8;
         break;
     case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
         format = DXGI_FORMAT_R32G32B32A32_UINT;
+        size = 16;
         break;
     case TINYGLTF_COMPONENT_TYPE_FLOAT:
         format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+        size = 16;
         break;
     default:
         break;
@@ -618,7 +640,7 @@ HRESULT SceneManager::CreateMaterials(const tinygltf::Model& model, SceneArrays&
     for (auto& gm : model.materials) {
         Material material;
         if (gm.alphaMode == "BLEND") {
-            material.mode = BLEND_MODE;
+            material.mode = AlphaMode::BLEND_MODE;
             result = managerStorage_->GetStateManager()->CreateBlendState(material.blendState);
             if (SUCCEEDED(result)) {
                 result = managerStorage_->GetStateManager()->CreateDepthStencilState(material.depthStencilState,
@@ -626,12 +648,12 @@ HRESULT SceneManager::CreateMaterials(const tinygltf::Model& model, SceneArrays&
             }
         }
         else if (gm.alphaMode == "MASK") {
-            material.mode = ALPHA_CUTOFF_MODE;
+            material.mode = AlphaMode::ALPHA_CUTOFF_MODE;
             material.alphaCutoff = gm.alphaCutoff;
             result = managerStorage_->GetStateManager()->CreateDepthStencilState(material.depthStencilState);
         }
         else {
-            material.mode = OPAQUE_MODE;
+            material.mode = AlphaMode::OPAQUE_MODE;
             result = managerStorage_->GetStateManager()->CreateDepthStencilState(material.depthStencilState);
         }
 
@@ -734,10 +756,10 @@ HRESULT SceneManager::CreateMeshes(const tinygltf::Model& model, SceneArrays& ar
             }
 
             switch (arrays.materials[primitive.materialId].mode) {
-            case BLEND_MODE:
+            case AlphaMode::BLEND_MODE:
                 mesh.transparentPrimitives.push_back(primitive);
                 break;
-            case ALPHA_CUTOFF_MODE:
+            case AlphaMode::ALPHA_CUTOFF_MODE:
                 mesh.primitivesWithAlphaCutoff.push_back(primitive);
                 break;
             default:
@@ -823,7 +845,7 @@ void SceneManager::ParseAttributes(const SceneArrays& arrays, const tinygltf::Pr
     if (material.emissiveTA.textureId >= 0) {
         baseDefines.push_back("HAS_EMISSIVE_TEXTURE");
     }
-    if (material.mode == ALPHA_CUTOFF_MODE) {
+    if (material.mode == AlphaMode::ALPHA_CUTOFF_MODE) {
         baseDefines.push_back("HAS_ALPHA_CUTOFF");
     }
     attributes.clear();
@@ -893,7 +915,7 @@ HRESULT SceneManager::CreateShaders(Primitive& primitive, const SceneArrays& arr
     if (SUCCEEDED(result)) {
         result = managerStorage_->GetPSManager()->LoadShader(primitive.PSGeometry, L"shaders/PS.hlsl", geometryMacros);
     }
-    if (SUCCEEDED(result) && arrays.materials[primitive.materialId].mode != OPAQUE_MODE) { // opaque without pixel shader for shadow map
+    if (SUCCEEDED(result) && arrays.materials[primitive.materialId].mode != AlphaMode::OPAQUE_MODE) { // opaque without pixel shader for shadow map
         result = managerStorage_->GetPSManager()->LoadShader(primitive.shadowPS, L"shaders/shadowPS.hlsl", baseDefines);
     }
 
@@ -924,10 +946,10 @@ HRESULT SceneManager::CreateNodes(const tinygltf::Model& model, SceneArrays& arr
         }
         else {
             node.transformation = {
-                XMVECTOR{(float)gn.matrix[0], (float)gn.matrix[4], (float)gn.matrix[8], (float)gn.matrix[12]},
-                XMVECTOR{(float)gn.matrix[1], (float)gn.matrix[5], (float)gn.matrix[9], (float)gn.matrix[13]},
-                XMVECTOR{(float)gn.matrix[2], (float)gn.matrix[6], (float)gn.matrix[10], (float)gn.matrix[14]},
-                XMVECTOR{(float)gn.matrix[3], (float)gn.matrix[7], (float)gn.matrix[11], (float)gn.matrix[15]}
+                XMVECTOR{(float)gn.matrix[0], (float)gn.matrix[1], (float)gn.matrix[2], (float)gn.matrix[3]},
+                XMVECTOR{(float)gn.matrix[4], (float)gn.matrix[5], (float)gn.matrix[6], (float)gn.matrix[7]},
+                XMVECTOR{(float)gn.matrix[8], (float)gn.matrix[9], (float)gn.matrix[10], (float)gn.matrix[11]},
+                XMVECTOR{(float)gn.matrix[12], (float)gn.matrix[13], (float)gn.matrix[14], (float)gn.matrix[15]}
             };
         }
 
@@ -971,13 +993,13 @@ void SceneManager::CreateShadowMapForNode(int arrayId, int nodeId, const XMMATRI
     if (node.meshId >= 0) {
         const Mesh& mesh = sceneArrays_[arrayId].meshes[node.meshId];
         for (auto& p : mesh.opaquePrimitives) {
-            CreateShadowMapForPrimitive(arrayId, p, OPAQUE_MODE, currentTransformation);
+            CreateShadowMapForPrimitive(arrayId, p, AlphaMode::OPAQUE_MODE, currentTransformation);
         }
         for (auto& p : mesh.transparentPrimitives) {
-            CreateShadowMapForPrimitive(arrayId, p, ALPHA_CUTOFF_MODE, currentTransformation);
+            CreateShadowMapForPrimitive(arrayId, p, AlphaMode::ALPHA_CUTOFF_MODE, currentTransformation);
         }
         for (auto& p : mesh.primitivesWithAlphaCutoff) {
-            CreateShadowMapForPrimitive(arrayId, p, ALPHA_CUTOFF_MODE, currentTransformation);
+            CreateShadowMapForPrimitive(arrayId, p, AlphaMode::ALPHA_CUTOFF_MODE, currentTransformation);
         }
     }
 
@@ -993,7 +1015,7 @@ void SceneManager::CreateShadowMapForPrimitive(int arrayId, const Primitive& pri
     worldMatrix.worldMatrix = transformation;
     device_->GetDeviceContext()->UpdateSubresource(worldMatrixBuffer_, 0, nullptr, &worldMatrix, 0, 0);
 
-    if (mode == ALPHA_CUTOFF_MODE) {
+    if (mode == AlphaMode::ALPHA_CUTOFF_MODE) {
         ShadowMapAlphaCutoffBuffer alphaCutoff;
         alphaCutoff.baseColorFactor = material.baseColorFactor;
         alphaCutoff.alphaCutoffTexCoord = XMFLOAT4(material.alphaCutoff, material.baseColorTA.texCoordId, 0.0f, 0.0f);
@@ -1026,7 +1048,7 @@ void SceneManager::CreateShadowMapForPrimitive(int arrayId, const Primitive& pri
     device_->GetDeviceContext()->VSSetConstantBuffers(0, 1, &worldMatrixBuffer_);
     device_->GetDeviceContext()->VSSetConstantBuffers(1, 1, &shadowMapViewMatrixBuffer_);
 
-    if (mode == ALPHA_CUTOFF_MODE) {
+    if (mode == AlphaMode::ALPHA_CUTOFF_MODE) {
         device_->GetDeviceContext()->PSSetShader(primitive.shadowPS->GetShader().get(), nullptr, 0);
         device_->GetDeviceContext()->PSSetConstantBuffers(0, 1, &shadowMapAlphaCutoffBuffer_);
     }
@@ -1197,11 +1219,11 @@ bool SceneManager::Render(
     sceneBuffer.viewProjectionMatrix = camera_->GetViewProjectionMatrix();
     sceneBuffer.cameraPos = XMFLOAT4(cameraPos.x, cameraPos.y, cameraPos.z, 1.0f);
     sceneBuffer.lightParams = XMINT4(int(lights.size()), 0, 0, 0);
+    sceneBuffer.directionalLight = directionalLight_->GetInfo();
     for (int i = 0; i < lights.size() && i < MAX_LIGHT; ++i) {
         sceneBuffer.lights[i].pos = lights[i].pos;
         sceneBuffer.lights[i].color = lights[i].color;
     }
-    sceneBuffer.directionalLight = directionalLight_->GetInfo();
     device_->GetDeviceContext()->Unmap(viewMatrixBuffer_, 0);
 
     for (auto j : sceneIndices) {
@@ -1300,6 +1322,9 @@ void SceneManager::RenderPrimitive(
         };
         device_->GetDeviceContext()->PSSetShaderResources(k++, resources.size(), resources.data());
     }
+    else {
+        device_->GetDeviceContext()->PSSetShaderResources(k++, 0, nullptr);
+    }
     if (material.roughMetallicTA.textureId >= 0) {
         std::vector<ID3D11SamplerState*> samplers = { sceneArrays_[arrayId].samplers[material.roughMetallicTA.samplerId].get() };
         device_->GetDeviceContext()->PSSetSamplers(m++, samplers.size(), samplers.data());
@@ -1308,6 +1333,9 @@ void SceneManager::RenderPrimitive(
             sceneArrays_[arrayId].textures[material.roughMetallicTA.textureId]->GetSRV(material.roughMetallicTA.isSRGB).get()
         };
         device_->GetDeviceContext()->PSSetShaderResources(k++, resources.size(), resources.data());
+    }
+    else {
+        device_->GetDeviceContext()->PSSetShaderResources(k++, 0, nullptr);
     }
     if (material.normalTA.textureId >= 0) {
         std::vector<ID3D11SamplerState*> samplers = { sceneArrays_[arrayId].samplers[material.normalTA.samplerId].get() };
@@ -1318,6 +1346,9 @@ void SceneManager::RenderPrimitive(
         };
         device_->GetDeviceContext()->PSSetShaderResources(k++, resources.size(), resources.data());
     }
+    else {
+        device_->GetDeviceContext()->PSSetShaderResources(k++, 0, nullptr);
+    }
     if (material.occlusionTA.textureId >= 0) {
         std::vector<ID3D11SamplerState*> samplers = { sceneArrays_[arrayId].samplers[material.occlusionTA.samplerId].get() };
         device_->GetDeviceContext()->PSSetSamplers(m++, samplers.size(), samplers.data());
@@ -1327,6 +1358,9 @@ void SceneManager::RenderPrimitive(
         };
         device_->GetDeviceContext()->PSSetShaderResources(k++, resources.size(), resources.data());
     }
+    else {
+        device_->GetDeviceContext()->PSSetShaderResources(k++, 0, nullptr);
+    }
     if (material.emissiveTA.textureId >= 0) {
         std::vector<ID3D11SamplerState*> samplers = { sceneArrays_[arrayId].samplers[material.emissiveTA.samplerId].get() };
         device_->GetDeviceContext()->PSSetSamplers(m++, samplers.size(), samplers.data());
@@ -1335,6 +1369,9 @@ void SceneManager::RenderPrimitive(
             sceneArrays_[arrayId].textures[material.emissiveTA.textureId]->GetSRV(material.emissiveTA.isSRGB).get()
         };
         device_->GetDeviceContext()->PSSetShaderResources(k++, resources.size(), resources.data());
+    }
+    else {
+        device_->GetDeviceContext()->PSSetShaderResources(k++, 0, nullptr);
     }
 
     device_->GetDeviceContext()->OMSetDepthStencilState(material.depthStencilState.get(), 0);

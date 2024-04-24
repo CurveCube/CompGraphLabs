@@ -43,8 +43,8 @@ bool Renderer::Init(HINSTANCE hInstance, HWND hWnd) {
         result = GenerateTextures();
     }
     if (SUCCEEDED(result)) {
-        camera_ = std::shared_ptr<Camera>(new Camera(XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 3.0f, 3.0f), XM_PI / 3, width_,
-            height_, 0.01f, 1000.0f));
+        camera_ = std::shared_ptr<Camera>(new Camera(XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 50.0f, 50.0f), XM_PI / 3, width_,
+            height_, 0.01f, 500.0f));
         dirLight_ = std::make_shared<DirectionalLight>();
     }
     if (SUCCEEDED(result)) {
@@ -57,7 +57,7 @@ bool Renderer::Init(HINSTANCE hInstance, HWND hWnd) {
     if (SUCCEEDED(result)) {
         UINT index = 0;
         UINT count = 0;
-        result = sceneManager_.LoadScene("models/statue/scene.gltf", index, count);
+        result = sceneManager_.LoadScene("models/scene/untitled.gltf", index, count);
         if (SUCCEEDED(result) && (index != 0 || count != 1)) {
             result = E_FAIL;
         }
@@ -224,7 +224,7 @@ void Renderer::UpdateImgui() {
 
         brightnessDir = dirLight_->color.w;
         str = "Brightness";
-        ImGui::DragFloat(str.c_str(), &brightnessDir, 1.0f, 1.0f, 1000.0f);
+        ImGui::DragFloat(str.c_str(), &brightnessDir, 1.0f, 1.0f, 50.0f);
         dirLight_->color = XMFLOAT4(colDir[0], colDir[1], colDir[2], brightnessDir);
 
         str = "Phi";
@@ -289,6 +289,8 @@ bool Renderer::Render() {
     pAnnotation_->BeginEvent(L"Preliminary_preparations");
 #endif
 
+    device_->GetDeviceContext()->ClearState();
+
     if (default_) {
         if (!sceneManager_.CreateShadowMaps({ 0 })) {
             return false;
@@ -300,7 +302,6 @@ bool Renderer::Render() {
     }
 
     UpdateImgui();
-    device_->GetDeviceContext()->ClearState();
     device_->GetDeviceContext()->RSSetViewports(1, &viewport_);
 
     D3D11_RECT rect;

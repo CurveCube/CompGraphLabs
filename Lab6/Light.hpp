@@ -17,7 +17,7 @@ struct DirectionalLight {
         XMFLOAT4 direction;
         XMFLOAT4 color;
         XMMATRIX viewProjectionMatrix;
-        UINT splitSizeRatio[CSM_SPLIT_COUNT];
+        XMUINT4 splitSizeRatio;
     };
 
     float r = 10.0f;
@@ -68,9 +68,10 @@ struct DirectionalLight {
         info.color = color;
         info.direction = direction;
         info.viewProjectionMatrix = viewProjectionMatrices[0];
-        for (int i = 0; i < CSM_SPLIT_COUNT; ++i) {
-            info.splitSizeRatio[i] = splitSizeRatio[i];
-        }
+        info.splitSizeRatio.x = splitSizeRatio[0];
+        info.splitSizeRatio.y = splitSizeRatio[1];
+        info.splitSizeRatio.z = splitSizeRatio[2];
+        info.splitSizeRatio.w = splitSizeRatio[3];
         return info;
     };
 

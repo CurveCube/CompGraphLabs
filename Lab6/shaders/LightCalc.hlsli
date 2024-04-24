@@ -45,10 +45,12 @@ float geometrySmith(in float3 n, in float3 v, in float3 l, in float roughness) {
 float shadowFactor(in float3 pos) {
     float4 lightProjPos = mul(directionalLight.viewProjectionMatrix, float4(pos, 1.0f));
     float4x4 M_uv = float4x4(0.5f, 0, 0, 0, 0, -0.5f, 0, 0, 0, 0, 1.0f, 0, 0.5f, 0.5f, 0, 1.0f);
+    uint splitSizeRatio[4] = { directionalLight.splitSizeRatio[0], directionalLight.splitSizeRatio[1],
+        directionalLight.splitSizeRatio[2], directionalLight.splitSizeRatio[3] };
     int i = 0;
     while ((lightProjPos.x > 1.0f || lightProjPos.x < -1.0f || lightProjPos.y > 1.0f || lightProjPos.y < -1.0f) && i < 3) {
         ++i;
-        lightProjPos.xy = lightProjPos.xy * directionalLight.splitSizeRatio[0] / directionalLight.splitSizeRatio[i];
+        lightProjPos.xy = lightProjPos.xy * splitSizeRatio[0] / splitSizeRatio[i];
     }
     lightProjPos = mul(M_uv, lightProjPos);
     if (i == 0) {

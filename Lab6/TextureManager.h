@@ -26,7 +26,7 @@ public:
     };
 
     HRESULT SetAnnotationText(const std::string& annotationText = "") {
-        return texture_->SetPrivateData(WKPDID_D3DDebugObjectName, annotationText.size(), annotationText.c_str());
+        return texture_->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)annotationText.size(), annotationText.c_str());
     };
 
     bool IsHDR() const {

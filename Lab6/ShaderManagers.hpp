@@ -127,7 +127,7 @@ public:
                 nullptr, &vertexShader);
         }
         if (SUCCEEDED(result) && ILDesc.size() > 0) {
-            result = device_->GetDevice()->CreateInputLayout(ILDesc.data(), ILDesc.size(), vertexShaderBuffer->GetBufferPointer(),
+            result = device_->GetDevice()->CreateInputLayout(ILDesc.data(), (UINT)ILDesc.size(), vertexShaderBuffer->GetBufferPointer(),
                 vertexShaderBuffer->GetBufferSize(), &inputLayout);
         }
         if (SUCCEEDED(result)) {

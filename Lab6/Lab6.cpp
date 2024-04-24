@@ -39,7 +39,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE     hInstance,
 
     HACCEL hAccelTable = LoadAccelerators(hInstance, L"");
 
-    MSG msg;
+    MSG msg = {};
     Renderer& renderer = Renderer::GetInstance();
 
     bool exit = false;

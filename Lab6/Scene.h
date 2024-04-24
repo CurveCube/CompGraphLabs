@@ -48,14 +48,14 @@ class SceneManager {
         bool isSRGB = false;
     };
 
-    enum AlphaMode {
+    enum class AlphaMode {
         OPAQUE_MODE,
         BLEND_MODE,
         ALPHA_CUTOFF_MODE
     };
 
     struct Material {
-        AlphaMode mode = OPAQUE_MODE;
+        AlphaMode mode = AlphaMode::OPAQUE_MODE;
         XMFLOAT4 baseColorFactor = { 1.0f, 1.0f, 1.0f, 1.0f };
         float metallicFactor = 1.0f;
         float roughnessFactor = 1.0f;
@@ -117,8 +117,8 @@ class SceneManager {
         XMMATRIX viewProjectionMatrix;
         XMFLOAT4 cameraPos;
         XMINT4 lightParams;
-        SpotLight lights[MAX_LIGHT];
         DirectionalLight::DirectionalLightInfo directionalLight;
+        SpotLight lights[MAX_LIGHT];
     };
 
     struct MaterialParamsBuffer {
@@ -190,11 +190,11 @@ private:
     HRESULT CreateMaterials(const tinygltf::Model& model, SceneArrays& arrays);
     HRESULT CreateMeshes(const tinygltf::Model& model, SceneArrays& arrays);
     HRESULT CreateNodes(const tinygltf::Model& model, SceneArrays& arrays);
-    DXGI_FORMAT GetFormat(const tinygltf::Accessor& accessor);
-    DXGI_FORMAT GetFormatScalar(const tinygltf::Accessor& accessor);
-    DXGI_FORMAT GetFormatVec2(const tinygltf::Accessor& accessor);
-    DXGI_FORMAT GetFormatVec3(const tinygltf::Accessor& accessor);
-    DXGI_FORMAT GetFormatVec4(const tinygltf::Accessor& accessor);
+    DXGI_FORMAT GetFormat(const tinygltf::Accessor& accessor, UINT& size);
+    DXGI_FORMAT GetFormatScalar(const tinygltf::Accessor& accessor, UINT& size);
+    DXGI_FORMAT GetFormatVec2(const tinygltf::Accessor& accessor, UINT& size);
+    DXGI_FORMAT GetFormatVec3(const tinygltf::Accessor& accessor, UINT& size);
+    DXGI_FORMAT GetFormatVec4(const tinygltf::Accessor& accessor, UINT& size);
     D3D11_TEXTURE_ADDRESS_MODE GetSamplerMode(int m);
     void ParseAttributes(const SceneArrays& arrays, const tinygltf::Primitive& primitive,
         std::vector<Attribute>& attributes, std::vector<std::string>& baseDefines, std::vector<D3D11_INPUT_ELEMENT_DESC>& desc);
