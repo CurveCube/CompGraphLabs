@@ -43,7 +43,7 @@ bool Renderer::Init(HINSTANCE hInstance, HWND hWnd) {
         result = GenerateTextures();
     }
     if (SUCCEEDED(result)) {
-        camera_ = std::shared_ptr<Camera>(new Camera(XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 50.0f, 50.0f), XM_PI / 3, width_,
+        camera_ = std::shared_ptr<Camera>(new Camera(XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 100.0f, 50.0f), XM_PI / 3, width_,
             height_, 0.01f, 500.0f));
         dirLight_ = std::make_shared<DirectionalLight>();
     }
@@ -148,12 +148,13 @@ void Renderer::UpdateImgui() {
         ImGui::Text(str.c_str());
 
         static int cur = 0;
-        if (ImGui::Combo("Mode", &cur, "default\0point light fresnel\0point light ndf\0point light geometry")) {
+        if (ImGui::Combo("Mode", &cur, "default\0point light fresnel\0point light ndf\0point light geometry\0shadow splits")) {
             switch (cur) {
             case 0:
                 default_ = true;
                 //sphere_.SetMode(SimpleObject::DEFAULT);
                 sceneManager_.SetMode(SceneManager::DEFAULT);
+                toneMapping_.ResetEyeAdaptation();
                 break;
             case 1:
                 default_ = false;
@@ -171,6 +172,11 @@ void Renderer::UpdateImgui() {
                 default_ = false;
                 //sphere_.SetMode(SimpleObject::GEOMETRY);
                 sceneManager_.SetMode(SceneManager::GEOMETRY);
+                toneMapping_.ResetEyeAdaptation();
+                break;
+            case 4:
+                default_ = true;
+                sceneManager_.SetMode(SceneManager::SHADOW_SPLITS);
                 toneMapping_.ResetEyeAdaptation();
                 break;
             default:
@@ -224,7 +230,7 @@ void Renderer::UpdateImgui() {
 
         brightnessDir = dirLight_->color.w;
         str = "Brightness";
-        ImGui::DragFloat(str.c_str(), &brightnessDir, 1.0f, 1.0f, 50.0f);
+        ImGui::DragFloat(str.c_str(), &brightnessDir, 1.0f, 0.0f, 50.0f);
         dirLight_->color = XMFLOAT4(colDir[0], colDir[1], colDir[2], brightnessDir);
 
         str = "Phi";
@@ -234,16 +240,16 @@ void Renderer::UpdateImgui() {
         ImGui::DragFloat(str.c_str(), &dirLight_->theta, 0.01f, -XM_PIDIV2, XM_PIDIV2);
 
         str = "Distance";
-        ImGui::DragFloat(str.c_str(), &dirLight_->r, 1.0f, 10.0f, 1000.0f);
+        ImGui::DragFloat(str.c_str(), &dirLight_->r, 1.0f, 100.0f, 300.0f);
 
-        dirLight_->Update(camera_->GetPosition());
+        dirLight_->Update(camera_->GetFocusPosition());
 
         str = "Point lights";
         ImGui::Text(str.c_str());
         ImGui::SameLine();
         if (ImGui::Button("+")) {
             if (lights_.size() < MAX_LIGHT)
-                lights_.push_back({ XMFLOAT4(5.0f, 5.0f, 5.0f, 0.0f), XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f) });
+                lights_.push_back({ XMFLOAT4(15.0f, 15.0f, 15.0f, 0.0f), XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f) });
         }
         ImGui::SameLine();
         if (ImGui::Button("-")) {
@@ -262,7 +268,7 @@ void Renderer::UpdateImgui() {
             pos[i][1] = lights_[i].pos.y;
             pos[i][2] = lights_[i].pos.z;
             str = "Pos " + std::to_string(i);
-            ImGui::DragFloat3(str.c_str(), pos[i], 0.1f, -15.0f, 15.0f);
+            ImGui::DragFloat3(str.c_str(), pos[i], 1.0f, -115.0f, 115.0f);
             lights_[i].pos = XMFLOAT4(pos[i][0], pos[i][1], pos[i][2], 1.0f);
 
             col[i][0] = lights_[i].color.x;
@@ -274,7 +280,7 @@ void Renderer::UpdateImgui() {
 
             brightness[i] = lights_[i].color.w;
             str = "Brightness " + std::to_string(i);
-            ImGui::DragFloat(str.c_str(), &brightness[i], 1.0f, 1.0f, 1000.0f);
+            ImGui::DragFloat(str.c_str(), &brightness[i], 10.0f, 1.0f, 10000.0f);
             lights_[i].color.w = brightness[i];
         }
 
@@ -284,24 +290,34 @@ void Renderer::UpdateImgui() {
 }
 
 bool Renderer::Render() {
+    UpdateImgui();
+
 #ifdef _DEBUG
     pAnnotation_->BeginEvent(L"Render_scene");
     pAnnotation_->BeginEvent(L"Preliminary_preparations");
 #endif
 
     device_->GetDeviceContext()->ClearState();
-
+#ifdef _DEBUG
+    pAnnotation_->BeginEvent(L"Create_shadow_maps");
+#endif
     if (default_) {
         if (!sceneManager_.CreateShadowMaps({ 0 })) {
             return false;
         }
     }
 
+#ifdef _DEBUG
+    pAnnotation_->EndEvent();
+    pAnnotation_->BeginEvent(L"Prepare_transparent");
+#endif
     if (!sceneManager_.PrepareTransparent({ 0 })) {
         return false;
     }
+#ifdef _DEBUG
+    pAnnotation_->EndEvent();
+#endif
 
-    UpdateImgui();
     device_->GetDeviceContext()->RSSetViewports(1, &viewport_);
 
     D3D11_RECT rect;
@@ -312,14 +328,15 @@ bool Renderer::Render() {
     device_->GetDeviceContext()->RSSetScissorRects(1, &rect);
 
     static const FLOAT backColor[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
-    device_->GetDeviceContext()->ClearRenderTargetView(swapChain_.GetRenderTarget().get(), backColor);
     device_->GetDeviceContext()->ClearDepthStencilView(depthStencilView_, D3D11_CLEAR_DEPTH, 0.0f, 0);
 
     if (default_) {
+        device_->GetDeviceContext()->ClearRenderTargetView(toneMapping_.GetRenderTarget().get(), backColor);
         ID3D11RenderTargetView* rtv[] = { toneMapping_.GetRenderTarget().get() };
         device_->GetDeviceContext()->OMSetRenderTargets(1, rtv, depthStencilView_);
     }
     else {
+        device_->GetDeviceContext()->ClearRenderTargetView(swapChain_.GetRenderTarget().get(), backColor);
         ID3D11RenderTargetView* rtv[] = { swapChain_.GetRenderTarget().get() };
         device_->GetDeviceContext()->OMSetRenderTargets(1, rtv, depthStencilView_);
     }
@@ -424,7 +441,7 @@ void Renderer::MoveCamera(int upDown, int rightLeft, int forwardBack) {
         dy = camera_->GetDistanceToFocus() * upDown / 30.0f,
         dz = -camera_->GetDistanceToFocus() * rightLeft / 30.0f;
     camera_->Move(dx, dy, dz);
-    dirLight_->Update(camera_->GetPosition());
+    dirLight_->Update(camera_->GetFocusPosition());
 }
 
 void Renderer::OnMouseWheel(int delta) {
@@ -441,7 +458,7 @@ void Renderer::OnMouseMove(int x, int y) {
         camera_->Rotate((mousePrevX_ - x) / 200.0f, (y - mousePrevY_) / 200.0f);
         mousePrevX_ = x;
         mousePrevY_ = y;
-        dirLight_->Update(camera_->GetPosition());
+        dirLight_->Update(camera_->GetFocusPosition());
     }
 }
 

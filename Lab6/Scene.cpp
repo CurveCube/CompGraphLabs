@@ -899,6 +899,9 @@ HRESULT SceneManager::CreateShaders(Primitive& primitive, const SceneArrays& arr
     std::vector<std::string> geometryMacros = baseDefines;
     geometryMacros.push_back("GEOMETRY");
 
+    std::vector<std::string> shadowSplitsMacros = defaulMacros;
+    shadowSplitsMacros.push_back("SHADOW_SPLITS");
+
     HRESULT result = managerStorage_->GetVSManager()->LoadShader(primitive.VS, L"shaders/VS.hlsl", baseDefines, desc);
     if (SUCCEEDED(result)) {
         result = managerStorage_->GetVSManager()->LoadShader(primitive.shadowVS, L"shaders/shadowVS.hlsl", baseDefines, desc);
@@ -914,6 +917,9 @@ HRESULT SceneManager::CreateShaders(Primitive& primitive, const SceneArrays& arr
     }
     if (SUCCEEDED(result)) {
         result = managerStorage_->GetPSManager()->LoadShader(primitive.PSGeometry, L"shaders/PS.hlsl", geometryMacros);
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetPSManager()->LoadShader(primitive.PSShadowSplits, L"shaders/PS.hlsl", shadowSplitsMacros);
     }
     if (SUCCEEDED(result) && arrays.materials[primitive.materialId].mode != AlphaMode::OPAQUE_MODE) { // opaque without pixel shader for shadow map
         result = managerStorage_->GetPSManager()->LoadShader(primitive.shadowPS, L"shaders/shadowPS.hlsl", baseDefines);
@@ -932,15 +938,15 @@ HRESULT SceneManager::CreateNodes(const tinygltf::Model& model, SceneArrays& arr
         if (gn.matrix.empty()) {
             XMMATRIX transformation = XMMatrixIdentity();
             if (!gn.translation.empty()) {
-                transformation = XMMatrixTranslation(gn.translation[0], gn.translation[1], gn.translation[2]);
+                transformation = XMMatrixMultiply(XMMatrixTranslation(gn.translation[0], gn.translation[1], gn.translation[2]), transformation);
             }
             if (!gn.rotation.empty()) {
-                transformation = XMMatrixMultiply(transformation, XMMatrixRotationQuaternion({
+                transformation = XMMatrixMultiply(XMMatrixRotationQuaternion({
                     (float)gn.rotation[0], (float)gn.rotation[1], (float)gn.rotation[2], (float)gn.rotation[3]
-                }));
+                }), transformation);
             }
             if (!gn.scale.empty()) {
-                transformation = XMMatrixMultiply(transformation, XMMatrixScaling(gn.scale[0], gn.scale[1], gn.scale[2]));
+                transformation = XMMatrixMultiply(XMMatrixScaling(gn.scale[0], gn.scale[1], gn.scale[2]), transformation);
             }
             node.transformation = transformation;
         }
@@ -988,7 +994,7 @@ bool SceneManager::CreateShadowMaps(const std::vector<int>& sceneIndices) {
 
 void SceneManager::CreateShadowMapForNode(int arrayId, int nodeId, const XMMATRIX& transformation) {
     const Node& node = sceneArrays_[arrayId].nodes[nodeId];
-    XMMATRIX currentTransformation = XMMatrixMultiply(transformation, node.transformation);
+    XMMATRIX currentTransformation = XMMatrixMultiply(node.transformation, transformation);
 
     if (node.meshId >= 0) {
         const Mesh& mesh = sceneArrays_[arrayId].meshes[node.meshId];
@@ -1093,7 +1099,7 @@ bool SceneManager::PrepareTransparent(const std::vector<int>& sceneIndices) {
 
 bool SceneManager::PrepareTransparentForNode(int arrayId, int nodeId, const XMMATRIX& transformation) {
     const Node& node = sceneArrays_[arrayId].nodes[nodeId];
-    XMMATRIX currentTransformation = XMMatrixMultiply(transformation, node.transformation);
+    XMMATRIX currentTransformation = XMMatrixMultiply(node.transformation, transformation);
 
     if (node.meshId >= 0) {
         for (auto& p : sceneArrays_[arrayId].meshes[node.meshId].transparentPrimitives) {
@@ -1253,7 +1259,7 @@ void SceneManager::RenderNode(
     const XMMATRIX& transformation
 ) {
     const Node& node = sceneArrays_[arrayId].nodes[nodeId];
-    XMMATRIX currentTransformation = XMMatrixMultiply(transformation, node.transformation);
+    XMMATRIX currentTransformation = XMMatrixMultiply(node.transformation, transformation);
 
     if (node.meshId >= 0) {
         const Mesh& mesh = sceneArrays_[arrayId].meshes[node.meshId];
@@ -1296,7 +1302,7 @@ void SceneManager::RenderPrimitive(
     materialBuffer.occlusionTA = XMINT4(material.occlusionTA.textureId, material.occlusionTA.texCoordId, material.occlusionTA.samplerId, material.occlusionTA.isSRGB);
     device_->GetDeviceContext()->UpdateSubresource(materialParamsBuffer_, 0, nullptr, &materialBuffer, 0, 0);
 
-    if (currentMode_ == DEFAULT) {
+    if (currentMode_ == DEFAULT || currentMode_ == SHADOW_SPLITS) {
         std::vector<ID3D11SamplerState*> samplers = { };
         samplers.push_back(samplerAvg_.get());
         samplers.push_back(samplerPCF_.get());
@@ -1403,12 +1409,16 @@ void SceneManager::RenderPrimitive(
     case GEOMETRY:
         device_->GetDeviceContext()->PSSetShader(primitive.PSGeometry->GetShader().get(), nullptr, 0);
         break;
+    case SHADOW_SPLITS:
+        device_->GetDeviceContext()->PSSetShader(primitive.PSShadowSplits->GetShader().get(), nullptr, 0);
+        break;
     default:
         device_->GetDeviceContext()->PSSetShader(primitive.PSDefault->GetShader().get(), nullptr, 0);
         break;
     }
     device_->GetDeviceContext()->PSSetConstantBuffers(0, 1, &materialParamsBuffer_);
     device_->GetDeviceContext()->PSSetConstantBuffers(1, 1, &viewMatrixBuffer_);
+    device_->GetDeviceContext()->OMSetBlendState(material.blendState.get(), nullptr, 0xFFFFFFFF);
 
     if (primitive.indicesAccessorId >= 0) {
         const BufferAccessor& accessor = sceneArrays_[arrayId].accessors[primitive.indicesAccessorId];

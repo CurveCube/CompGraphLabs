@@ -1,6 +1,6 @@
 #include "shaders/SceneMatrixBuffer.hlsli"
 
-#ifdef DEFAULT
+#if defined(DEFAULT)
 TextureCube irradianceTexture : register (t0);
 TextureCube prefilteredTexture : register (t1);
 Texture2D brdfTexture : register (t2);
@@ -41,8 +41,8 @@ float geometrySmith(in float3 n, in float3 v, in float3 l, in float roughness) {
     return geometrySchlickGGX(max(dot(n, v), 0.0f), roughness) * geometrySchlickGGX(max(dot(n, l), 0.0f), roughness);
 }
 
-#ifdef DEFAULT
-float shadowFactor(in float3 pos) {
+#if defined(DEFAULT)
+float4 shadowFactor(in float3 pos) {
     float4 lightProjPos = mul(directionalLight.viewProjectionMatrix, float4(pos, 1.0f));
     float4x4 M_uv = float4x4(0.5f, 0, 0, 0, 0, -0.5f, 0, 0, 0, 0, 1.0f, 0, 0.5f, 0.5f, 0, 1.0f);
     uint splitSizeRatio[4] = { directionalLight.splitSizeRatio[0], directionalLight.splitSizeRatio[1],
@@ -50,20 +50,20 @@ float shadowFactor(in float3 pos) {
     int i = 0;
     while ((lightProjPos.x > 1.0f || lightProjPos.x < -1.0f || lightProjPos.y > 1.0f || lightProjPos.y < -1.0f) && i < 3) {
         ++i;
-        lightProjPos.xy = lightProjPos.xy * splitSizeRatio[0] / splitSizeRatio[i];
+        lightProjPos.xy = lightProjPos.xy * splitSizeRatio[i - 1] / splitSizeRatio[i];
     }
-    lightProjPos = mul(M_uv, lightProjPos);
+    lightProjPos = mul(lightProjPos, M_uv);
     if (i == 0) {
-        return shadowMaps[0].SampleCmp(samplerPcf, lightProjPos.xy, lightProjPos.z);
+        return float4(shadowMaps[0].SampleCmp(samplerPcf, lightProjPos.xy, lightProjPos.z), 1.0f, 0.5f, 0.5f);
     }
     else if (i == 1) {
-        return shadowMaps[1].SampleCmp(samplerPcf, lightProjPos.xy, lightProjPos.z);
+        return float4(shadowMaps[1].SampleCmp(samplerPcf, lightProjPos.xy, lightProjPos.z), 0.5f, 1.0f, 0.5f);
     }
     else if (i == 2) {
-        return shadowMaps[2].SampleCmp(samplerPcf, lightProjPos.xy, lightProjPos.z);
+        return float4(shadowMaps[2].SampleCmp(samplerPcf, lightProjPos.xy, lightProjPos.z), 0.5f, 0.5f, 1.0f);
     }
     else {
-        return shadowMaps[3].SampleCmp(samplerPcf, lightProjPos.xy, lightProjPos.z);
+        return float4(shadowMaps[3].SampleCmp(samplerPcf, lightProjPos.xy, lightProjPos.z), 1.0f, 1.0f, 1.0f);
     }
 }
 #endif
@@ -87,7 +87,8 @@ float3 CalculateColor(in float3 objColor, in float3 objNormal, in float3 pos, in
     finalColor += ambient * occlusionFactor;
 
     float3 lightDir = normalize(directionalLight.lightDir.xyz);
-    float3 radiance = directionalLight.lightColor.xyz * directionalLight.lightColor.w * shadowFactor(pos);
+    float4 shadowFactors = shadowFactor(pos);
+    float3 radiance = directionalLight.lightColor.xyz * directionalLight.lightColor.w * shadowFactors.x;
     float3 F = fresnelFunction(objColor, normalize((viewDir + lightDir) / 2.0f), viewDir, metallic);
     float NDF = distributionGGX(objNormal, normalize((viewDir + lightDir) / 2.0f), roughness);
     float G = geometrySmith(objNormal, viewDir, lightDir, roughness);
@@ -134,5 +135,9 @@ float3 CalculateColor(in float3 objColor, in float3 objNormal, in float3 pos, in
 #endif
     }
 
+#ifdef SHADOW_SPLITS
+    return finalColor * float3(shadowFactors.y, shadowFactors.z, shadowFactors.w);
+#else
     return finalColor;
+#endif
 }

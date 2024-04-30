@@ -37,6 +37,7 @@ class SceneManager {
         std::shared_ptr<PixelShader> PSFresnel;
         std::shared_ptr<PixelShader> PSNdf;
         std::shared_ptr<PixelShader> PSGeometry;
+        std::shared_ptr<PixelShader> PSShadowSplits;
         std::shared_ptr<VertexShader> shadowVS;
         std::shared_ptr<PixelShader> shadowPS;
     };
@@ -152,7 +153,8 @@ public:
         DEFAULT,
         FRESNEL,
         NDF,
-        GEOMETRY
+        GEOMETRY,
+        SHADOW_SPLITS
     };
 
     SceneManager();
