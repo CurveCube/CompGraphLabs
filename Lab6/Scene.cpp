@@ -1245,7 +1245,7 @@ bool SceneManager::Render(
         return false;
     }
 
-    RenderTransparent(irradianceMap, prefilteredMap, BRDF);
+    //RenderTransparent(irradianceMap, prefilteredMap, BRDF);
 
     return true;
 }

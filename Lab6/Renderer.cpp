@@ -311,9 +311,9 @@ bool Renderer::Render() {
     pAnnotation_->EndEvent();
     pAnnotation_->BeginEvent(L"Prepare_transparent");
 #endif
-    if (!sceneManager_.PrepareTransparent({ 0 })) {
-        return false;
-    }
+    //if (!sceneManager_.PrepareTransparent({ 0 })) {
+    //    return false;
+    //}
 #ifdef _DEBUG
     pAnnotation_->EndEvent();
 #endif
