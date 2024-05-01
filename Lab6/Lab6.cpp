@@ -11,6 +11,7 @@ WCHAR szWindowClass[MAX_LOADSTRING];
 ATOM                 MyRegisterClass(HINSTANCE hInstance);
 BOOL                 InitInstance(HINSTANCE, int);
 LRESULT CALLBACK     WndProc(HWND, UINT, WPARAM, LPARAM);
+void keyPressProc();
 
 int APIENTRY wWinMain(_In_ HINSTANCE     hInstance,
                       _In_opt_ HINSTANCE hPrevInstance,
@@ -52,11 +53,37 @@ int APIENTRY wWinMain(_In_ HINSTANCE     hInstance,
             if (WM_QUIT == msg.message)
                 exit = true;
         }
+        keyPressProc();
+
         if (!renderer.Render())
             return FALSE;
     }
 
     return (int) msg.wParam;
+}
+
+void keyPressProc()
+{
+    int upDown = 0, rightLeft = 0, forwardBack = 0;
+    if (GetAsyncKeyState('W') & 0x8000 || GetAsyncKeyState(VK_UP) & 0x8000) {
+        ++forwardBack;
+    }
+    if (GetAsyncKeyState('S') & 0x8000 || GetAsyncKeyState(VK_DOWN) & 0x8000) {
+        --forwardBack;
+    }
+    if (GetAsyncKeyState('D') & 0x8000 || GetAsyncKeyState(VK_RIGHT) & 0x8000) {
+        --rightLeft;
+    }
+    if (GetAsyncKeyState('A') & 0x8000 || GetAsyncKeyState(VK_LEFT) & 0x8000) {
+        ++rightLeft;
+    }
+    if (GetAsyncKeyState('Q') & 0x8000 || GetAsyncKeyState(VK_RSHIFT) & 0x8000) {
+        ++upDown;
+    }
+    if (GetAsyncKeyState('E') & 0x8000 || GetAsyncKeyState(VK_RCONTROL) & 0x8000) {
+        --upDown;
+    }
+    Renderer::GetInstance().MoveCamera(upDown, rightLeft, forwardBack);
 }
 
 
@@ -129,30 +156,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
             RECT rc;
             GetClientRect(hWnd, &rc);
             Renderer::GetInstance().Resize(rc.right - rc.left, rc.bottom - rc.top);
-        }
-        break;
-    case WM_KEYDOWN:
-        {
-            int upDown = 0, rightLeft = 0, forwardBack = 0;
-            if (GetKeyState('W') & 0x8000 || GetKeyState(VK_UP) & 0x8000) {
-                ++forwardBack;
-            }
-            if (GetKeyState('S') & 0x8000 || GetKeyState(VK_DOWN) & 0x8000) {
-                --forwardBack;
-            }
-            if (GetKeyState('D') & 0x8000 || GetKeyState(VK_RIGHT) & 0x8000) {
-                --rightLeft;
-            }
-            if (GetKeyState('A') & 0x8000 || GetKeyState(VK_LEFT) & 0x8000) {
-                ++rightLeft;
-            }
-            if (GetKeyState('Q') & 0x8000 || GetKeyState(VK_RSHIFT) & 0x8000) {
-                ++upDown;
-            }
-            if (GetKeyState('E') & 0x8000 || GetKeyState(VK_RCONTROL) & 0x8000) {
-                --upDown;
-            }
-            Renderer::GetInstance().MoveCamera(upDown, rightLeft, forwardBack);
         }
         break;
     case WM_MOUSEWHEEL:
