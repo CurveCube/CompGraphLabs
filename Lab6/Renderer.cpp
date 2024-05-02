@@ -184,6 +184,10 @@ void Renderer::UpdateImgui() {
             }
         }
 
+        if (ImGui::Checkbox("Exclude transparent", &excludeTransparent_)) {
+            sceneManager_.ExcludeTransparent(excludeTransparent_);
+        }
+
         if (default_) {
             static float factor;
             factor = toneMapping_.GetFactor();
@@ -311,9 +315,9 @@ bool Renderer::Render() {
     pAnnotation_->EndEvent();
     pAnnotation_->BeginEvent(L"Prepare_transparent");
 #endif
-    //if (!sceneManager_.PrepareTransparent({ 0 })) {
-    //    return false;
-    //}
+    if (!sceneManager_.PrepareTransparent({ 0 })) {
+        return false;
+    }
 #ifdef _DEBUG
     pAnnotation_->EndEvent();
 #endif

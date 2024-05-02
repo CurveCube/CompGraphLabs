@@ -62,8 +62,11 @@ float4 shadowFactor(in float3 pos) {
     else if (i == 2) {
         return float4(shadowMaps[2].SampleCmp(samplerPcf, lightProjPos.xy, lightProjPos.z), 0.5f, 0.5f, 1.0f);
     }
-    else {
+    else if (lightProjPos.x > 1.0f || lightProjPos.x < 0.0f || lightProjPos.y > 1.0f || lightProjPos.y < 0.0f) {
         return float4(shadowMaps[3].SampleCmp(samplerPcf, lightProjPos.xy, lightProjPos.z), 1.0f, 1.0f, 1.0f);
+    }
+    else {
+        return float4(shadowMaps[3].SampleCmp(samplerPcf, lightProjPos.xy, lightProjPos.z), 0.5f, 0.5f, 0.5f);
     }
 }
 #endif

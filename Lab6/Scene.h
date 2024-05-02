@@ -70,6 +70,7 @@ class SceneManager {
         TextureAccessor emissiveTA;
         TextureAccessor occlusionTA;
         std::shared_ptr<ID3D11RasterizerState> rasterizerState;
+        std::shared_ptr<ID3D11RasterizerState> rasterizerStateWithDepthBias;
         std::shared_ptr<ID3D11DepthStencilState> depthStencilState;
         std::shared_ptr<ID3D11BlendState> blendState;
     };
@@ -177,6 +178,10 @@ public:
     bool IsInit() const;
     void Cleanup();
 
+    void ExcludeTransparent(bool exclude) {
+        excludeTransparent_ = exclude;
+    };
+
     ~SceneManager() {
         Cleanup();
     };
@@ -271,4 +276,5 @@ private:
     Mode currentMode_ = DEFAULT;
     std::vector<TransparentPrimitive> transparentPrimitives_;
     int n = 0;
+    bool excludeTransparent_ = true;
 };

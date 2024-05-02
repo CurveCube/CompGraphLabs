@@ -665,7 +665,8 @@ HRESULT SceneManager::CreateMaterials(const tinygltf::Model& model, SceneArrays&
         if (!gm.doubleSided) {
             cullMode = D3D11_CULL_BACK;
         }
-        result = managerStorage_->GetStateManager()->CreateRasterizerState(material.rasterizerState, D3D11_FILL_SOLID, cullMode, depthBias_, slopeScaleBias_);
+        result = managerStorage_->GetStateManager()->CreateRasterizerState(material.rasterizerState, D3D11_FILL_SOLID, cullMode);
+        result = managerStorage_->GetStateManager()->CreateRasterizerState(material.rasterizerStateWithDepthBias, D3D11_FILL_SOLID, cullMode, depthBias_, slopeScaleBias_);
 
         if (FAILED(result)) {
             break;
@@ -1048,7 +1049,7 @@ void SceneManager::CreateShadowMapForPrimitive(int arrayId, const Primitive& pri
         offsets.push_back(accessor.byteOffset);
     }
     device_->GetDeviceContext()->IASetVertexBuffers(0, numBuffers, vertexBuffers.data(), strides.data(), offsets.data());
-    device_->GetDeviceContext()->RSSetState(material.rasterizerState.get());
+    device_->GetDeviceContext()->RSSetState(material.rasterizerStateWithDepthBias.get());
     device_->GetDeviceContext()->IASetPrimitiveTopology(primitive.mode);
     device_->GetDeviceContext()->VSSetShader(primitive.shadowVS->GetShader().get(), nullptr, 0);
     device_->GetDeviceContext()->VSSetConstantBuffers(0, 1, &worldMatrixBuffer_);
@@ -1075,6 +1076,9 @@ void SceneManager::CreateShadowMapForPrimitive(int arrayId, const Primitive& pri
 bool SceneManager::PrepareTransparent(const std::vector<int>& sceneIndices) {
     if (!IsInit()) {
         return false;
+    }
+    if (excludeTransparent_) {
+        return true;
     }
 
     transparentPrimitives_.clear();
@@ -1245,7 +1249,9 @@ bool SceneManager::Render(
         return false;
     }
 
-    //RenderTransparent(irradianceMap, prefilteredMap, BRDF);
+    if (!excludeTransparent_) {
+        RenderTransparent(irradianceMap, prefilteredMap, BRDF);
+    }
 
     return true;
 }
