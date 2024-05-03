@@ -55,6 +55,8 @@ HRESULT SceneManager::Init(const std::shared_ptr<Device>& device, const std::sha
 
     transparentViewport_.Width = width;
     transparentViewport_.Height = height;
+    width_ = width;
+    height_ = height;
 
     HRESULT result = S_OK;
     for (UINT i = 0; i < CSM_SPLIT_COUNT && SUCCEEDED(result); ++i) {
@@ -956,6 +958,9 @@ HRESULT SceneManager::CreateShaders(Primitive& primitive, const SceneArrays& arr
     std::vector<std::string> SSAOMacros = defaulMacros;
     SSAOMacros.push_back("WITH_SSAO");
 
+    std::vector<std::string> SSAOMaskMacros = defaulMacros;
+    SSAOMaskMacros.push_back("SSAO_MASK");
+
     HRESULT result = managerStorage_->GetVSManager()->LoadShader(primitive.VS, L"shaders/VS.hlsl", baseDefines, desc);
     if (SUCCEEDED(result)) {
         result = managerStorage_->GetVSManager()->LoadShader(primitive.shadowVS, L"shaders/shadowVS.hlsl", baseDefines, desc);
@@ -977,6 +982,9 @@ HRESULT SceneManager::CreateShaders(Primitive& primitive, const SceneArrays& arr
     }
     if (SUCCEEDED(result)) {
         result = managerStorage_->GetPSManager()->LoadShader(primitive.PSSSAO, L"shaders/PS.hlsl", SSAOMacros);
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetPSManager()->LoadShader(primitive.PSSSAOMask, L"shaders/PS.hlsl", SSAOMaskMacros);
     }
     if (SUCCEEDED(result) && arrays.materials[primitive.materialId].mode != AlphaMode::OPAQUE_MODE) { // opaque without pixel shader for shadow map
         result = managerStorage_->GetPSManager()->LoadShader(primitive.shadowPS, L"shaders/shadowPS.hlsl", baseDefines);
@@ -1310,8 +1318,8 @@ bool SceneManager::Render(
     if (withSSAO_) {
         SSAOParamsBuffer buffer;
         buffer.parameters = XMFLOAT4(MAX_SSAO_SAMPLE_COUNT, SSAORadius_, SSAODepthLimit_, 0.0f);
+        buffer.sizes = XMFLOAT4(width_, height_, 0.0f, 0.0f);
         buffer.projectionMatrix = camera_->GetProjectionMatrix();
-        buffer.invProjectionMatrix = XMMatrixInverse(nullptr, buffer.projectionMatrix);
         buffer.viewMatrix = camera_->GetViewMatrix();
         for (int i = 0; i < MAX_SSAO_SAMPLE_COUNT; ++i) {
             buffer.samples[i] = SSAOSamples_[i];
@@ -1394,7 +1402,7 @@ void SceneManager::RenderPrimitive(
     materialBuffer.occlusionTA = XMINT4(material.occlusionTA.textureId, material.occlusionTA.texCoordId, material.occlusionTA.samplerId, material.occlusionTA.isSRGB);
     device_->GetDeviceContext()->UpdateSubresource(materialParamsBuffer_, 0, nullptr, &materialBuffer, 0, 0);
 
-    if (currentMode_ == DEFAULT || currentMode_ == SHADOW_SPLITS) {
+    if (currentMode_ == DEFAULT || currentMode_ == SHADOW_SPLITS || currentMode_ == SSAO_MASK) {
         std::vector<ID3D11SamplerState*> samplers = { };
         samplers.push_back(samplerAvg_.get());
         samplers.push_back(samplerPCF_.get());
@@ -1407,7 +1415,7 @@ void SceneManager::RenderPrimitive(
         for (UINT i = 0; i < CSM_SPLIT_COUNT; ++i) {
             resources.push_back(shadowSRViews_[i]);
         }
-        if (withSSAO_ && currentMode_ == DEFAULT) {
+        if (withSSAO_ && (currentMode_ == DEFAULT || currentMode_ == SSAO_MASK)) {
             resources.push_back(depthSRView_);
         }
         device_->GetDeviceContext()->PSSetShaderResources(0, resources.size(), resources.data());
@@ -1506,6 +1514,9 @@ void SceneManager::RenderPrimitive(
         break;
     case SHADOW_SPLITS:
         device_->GetDeviceContext()->PSSetShader(primitive.PSShadowSplits->GetShader().get(), nullptr, 0);
+        break;
+    case SSAO_MASK:
+        device_->GetDeviceContext()->PSSetShader(primitive.PSSSAOMask->GetShader().get(), nullptr, 0);
         break;
     default:
         if (withSSAO_) {
@@ -1665,6 +1676,9 @@ bool SceneManager::Resize(int width, int height) {
     if (!IsInit()) {
         return false;
     }
+    
+    width_ = width;
+    height_ = height;
 
     n = 0;
     int minSide = min(width, height);

@@ -5,21 +5,23 @@ TextureCube irradianceTexture : register (t0);
 TextureCube prefilteredTexture : register (t1);
 Texture2D brdfTexture : register (t2);
 Texture2D shadowMaps[4] : register (t3);
-#if defined(WITH_SSAO)
+#if defined(WITH_SSAO) || defined(SSAO_MASK)
 Texture2D depthTexture : register (t7);
 #endif
 SamplerState samplerAvg : register (s0);
 SamplerComparisonState samplerPcf : register (s1);
 #endif
 
+#if defined(WITH_SSAO) || defined(SSAO_MASK)
 cbuffer SSAOParamsBuffer : register (b2) {
     float4 parameters;
-    float4 samples[32];
-    float4x4 invProjectionMatrix;
+    float4 sizes;
+    float4 samples[64];
     float4x4 projectionMatrix;
     float4x4 viewMatrix;
     float4 noise[16];
 };
+#endif
 
 static float PI = 3.14159265359f;
 static float4x4 M_uv = float4x4(0.5f, 0, 0, 0, 0, -0.5f, 0, 0, 0, 0, 1.0f, 0, 0.5f, 0.5f, 0, 1.0f);
@@ -83,10 +85,10 @@ float4 shadowFactor(in float3 pos) {
 }
 #endif
 
-#if defined(WITH_SSAO)
-float calculateOcclusion(in float4 position, in float3 normal) {
-    int i = ((int)floor(position.x)) % 4;
-    int j = ((int)floor(position.y)) % 4;
+#if defined(WITH_SSAO) || defined(SSAO_MASK)
+float calculateOcclusion(in float4 position, in float4 worldPos, in float3 normal) {
+    int i = ((int)floor((position.x * 0.5 + 0.5) + sizes.x)) % 4;
+    int j = ((int)floor((position.y * 0.5 + 0.5) + sizes.y)) % 4;
 
     float3 rvec = noise[j * 4 + i].xyz;
     float3 tangent = normalize(rvec - normal * dot(rvec, normal));
@@ -96,9 +98,7 @@ float calculateOcclusion(in float4 position, in float3 normal) {
     tangent = mul(viewMatrix, float4(tangent, 1.0f)).xyz;
     bitangent = mul(viewMatrix, float4(bitangent, 1.0f)).xyz;
 
-    float4 ndc = position / position.w;
-    float4 homoViewPos = mul(invProjectionMatrix, ndc);
-    float3 viewPos = homoViewPos.xyz / homoViewPos.w;
+    float3 viewPos = mul(viewMatrix, worldPos).xyz;
     int occlusion = 0;
     for (int k = 0; k < (int)parameters.x; ++k) {
         float3 samplePos = viewPos + (samples[k].x * tangent + samples[k].y * bitangent + samples[k].z * normal) * parameters.y;
@@ -106,11 +106,11 @@ float calculateOcclusion(in float4 position, in float3 normal) {
         float3 samplePosNDC = samplePosProj.xyz / samplePosProj.w;
         float2 samplePosUV = mul(float4(samplePosNDC, 1.0f), M_uv).xy;
         float sampleDepth = depthTexture.Sample(samplerAvg, samplePosUV).x;
-        if (sampleDepth < samplePosNDC.z && (samplePosNDC.z - sampleDepth) < parameters.z) {
+        if (sampleDepth < samplePosNDC.z && abs(samplePosNDC.z - sampleDepth) < parameters.z) {
             ++occlusion;
         }
     }
-    return occlusion / parameters.x;
+    return 1.0f - occlusion / parameters.x;
 }
 #endif
 

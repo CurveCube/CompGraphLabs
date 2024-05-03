@@ -6,7 +6,7 @@
 #include "SkyBox.h"
 #include "tinygltf/tiny_gltf.h"
 
-#define MAX_SSAO_SAMPLE_COUNT 32
+#define MAX_SSAO_SAMPLE_COUNT 64
 #define NOISE_BUFFER_SIZE 16
 #define NOISE_BUFFER_SPLIT_SIZE 4
 
@@ -43,6 +43,7 @@ class SceneManager {
         std::shared_ptr<PixelShader> PSGeometry;
         std::shared_ptr<PixelShader> PSShadowSplits;
         std::shared_ptr<PixelShader> PSSSAO;
+        std::shared_ptr<PixelShader> PSSSAOMask;
         std::shared_ptr<VertexShader> shadowVS;
         std::shared_ptr<PixelShader> shadowPS;
     };
@@ -150,8 +151,8 @@ class SceneManager {
 
     struct SSAOParamsBuffer {
         XMFLOAT4 parameters;
+        XMFLOAT4 sizes;
         XMFLOAT4 samples[MAX_SSAO_SAMPLE_COUNT];
-        XMMATRIX invProjectionMatrix;
         XMMATRIX projectionMatrix;
         XMMATRIX viewMatrix;
         XMFLOAT4 noise[NOISE_BUFFER_SIZE];
@@ -169,7 +170,8 @@ public:
         FRESNEL,
         NDF,
         GEOMETRY,
-        SHADOW_SPLITS
+        SHADOW_SPLITS,
+        SSAO_MASK
     };
 
     SceneManager();
@@ -334,8 +336,8 @@ private:
     std::vector<Scene> scenes_;
     std::vector<SceneArrays> sceneArrays_;
 
-    float SSAODepthLimit_ = 1.0f;
-    float SSAORadius_ = 1.0f;
+    float SSAODepthLimit_ = 0.000003f;
+    float SSAORadius_ = 2.1f;
     XMFLOAT4 SSAOSamples_[MAX_SSAO_SAMPLE_COUNT];
     XMFLOAT4 SSAONoise_[NOISE_BUFFER_SIZE];
 
@@ -344,4 +346,6 @@ private:
     int n = 0;
     bool excludeTransparent_ = true;
     bool withSSAO_ = true;
+    int width_ = 0;
+    int height_ = 0;
 };

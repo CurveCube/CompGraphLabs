@@ -148,11 +148,12 @@ void Renderer::UpdateImgui() {
         ImGui::Text(str.c_str());
 
         static int cur = 0;
-        if (ImGui::Combo("Mode", &cur, "default\0point light fresnel\0point light ndf\0point light geometry\0shadow splits")) {
+        if (ImGui::Combo("Mode", &cur, "default\0point light fresnel\0point light ndf\0point light geometry\0shadow splits\0ssao mask")) {
             switch (cur) {
             case 0:
                 default_ = true;
                 shadowSplits_ = false;
+                withSSAO_ = true;
                 //sphere_.SetMode(SimpleObject::DEFAULT);
                 sceneManager_.SetMode(SceneManager::DEFAULT);
                 toneMapping_.ResetEyeAdaptation();
@@ -160,6 +161,7 @@ void Renderer::UpdateImgui() {
             case 1:
                 default_ = false;
                 shadowSplits_ = false;
+                withSSAO_ = false;
                 //sphere_.SetMode(SimpleObject::FRESNEL);
                 sceneManager_.SetMode(SceneManager::FRESNEL);
                 toneMapping_.ResetEyeAdaptation();
@@ -167,6 +169,7 @@ void Renderer::UpdateImgui() {
             case 2:
                 default_ = false;
                 shadowSplits_ = false;
+                withSSAO_ = false;
                 //sphere_.SetMode(SimpleObject::NDF);
                 sceneManager_.SetMode(SceneManager::NDF);
                 toneMapping_.ResetEyeAdaptation();
@@ -174,6 +177,7 @@ void Renderer::UpdateImgui() {
             case 3:
                 default_ = false;
                 shadowSplits_ = false;
+                withSSAO_ = false;
                 //sphere_.SetMode(SimpleObject::GEOMETRY);
                 sceneManager_.SetMode(SceneManager::GEOMETRY);
                 toneMapping_.ResetEyeAdaptation();
@@ -181,7 +185,15 @@ void Renderer::UpdateImgui() {
             case 4:
                 default_ = false;
                 shadowSplits_ = true;
+                withSSAO_ = false;
                 sceneManager_.SetMode(SceneManager::SHADOW_SPLITS);
+                toneMapping_.ResetEyeAdaptation();
+                break;
+            case 5:
+                default_ = false;
+                shadowSplits_ = false;
+                withSSAO_ = true;
+                sceneManager_.SetMode(SceneManager::SSAO_MASK);
                 toneMapping_.ResetEyeAdaptation();
                 break;
             default:
@@ -194,29 +206,29 @@ void Renderer::UpdateImgui() {
         }
 
         if (default_) {
-            if (ImGui::Checkbox("With SSAO", &withSSAO_)) {
-                sceneManager_.WithSSAO(withSSAO_);
-            }
-
             static float factor;
             factor = toneMapping_.GetFactor();
             str = "Exposure factor";
             ImGui::DragFloat(str.c_str(), &factor, 0.01f, 0.0f, 10.0f);
             toneMapping_.SetFactor(factor);
 
-            if (withSSAO_) {
-                static float radius;
-                radius = sceneManager_.GetSSAORadius();
-                str = "SSAO radius";
-                ImGui::DragFloat(str.c_str(), &radius, 0.01f, 0.0f, 10.0f);
-                sceneManager_.SetSSAORadius(radius);
-
-                static float depthLimit;
-                depthLimit = sceneManager_.GetSSAODepthLimit();
-                str = "SSAO depth limit";
-                ImGui::DragFloat(str.c_str(), &depthLimit, 0.001f, 0.0f, 1.0f);
-                sceneManager_.SetSSAODepthLimit(depthLimit);
+            if (ImGui::Checkbox("With SSAO", &withSSAO_)) {
+                sceneManager_.WithSSAO(withSSAO_);
             }
+        }
+
+        if (withSSAO_) {
+            static float radius;
+            radius = sceneManager_.GetSSAORadius();
+            str = "SSAO radius";
+            ImGui::DragFloat(str.c_str(), &radius, 0.01f, 0.0f, 10.0f);
+            sceneManager_.SetSSAORadius(radius);
+
+            static float depthLimit;
+            depthLimit = sceneManager_.GetSSAODepthLimit();
+            str = "SSAO depth limit";
+            ImGui::DragFloat(str.c_str(), &depthLimit, 0.000001f, 0.0f, 0.0001f, "%.6f");
+            sceneManager_.SetSSAODepthLimit(depthLimit);
         }
 
         /*str = "Object";
@@ -292,44 +304,46 @@ void Renderer::UpdateImgui() {
             sceneManager_.SetSlopeScaleBias(slopeScaleBias);
         }
 
-        str = "Point lights";
-        ImGui::Text(str.c_str());
-        ImGui::SameLine();
-        if (ImGui::Button("+")) {
-            if (lights_.size() < MAX_LIGHT)
-                lights_.push_back({ XMFLOAT4(15.0f, 15.0f, 15.0f, 0.0f), XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f) });
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("-")) {
-            if (lights_.size() > 0)
-                lights_.pop_back();
-        }
-
-        static float col[MAX_LIGHT][3];
-        static float pos[MAX_LIGHT][3];
-        static float brightness[MAX_LIGHT];
-        for (int i = 0; i < lights_.size(); i++) {
-            std::string str = "Light " + std::to_string(i);
+        if (!shadowSplits_ && (default_ || !withSSAO_)) {
+            str = "Point lights";
             ImGui::Text(str.c_str());
+            ImGui::SameLine();
+            if (ImGui::Button("+")) {
+                if (lights_.size() < MAX_LIGHT)
+                    lights_.push_back({ XMFLOAT4(15.0f, 15.0f, 15.0f, 0.0f), XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f) });
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("-")) {
+                if (lights_.size() > 0)
+                    lights_.pop_back();
+            }
 
-            pos[i][0] = lights_[i].pos.x;
-            pos[i][1] = lights_[i].pos.y;
-            pos[i][2] = lights_[i].pos.z;
-            str = "Pos " + std::to_string(i);
-            ImGui::DragFloat3(str.c_str(), pos[i], 1.0f, -115.0f, 115.0f);
-            lights_[i].pos = XMFLOAT4(pos[i][0], pos[i][1], pos[i][2], 1.0f);
+            static float col[MAX_LIGHT][3];
+            static float pos[MAX_LIGHT][3];
+            static float brightness[MAX_LIGHT];
+            for (int i = 0; i < lights_.size(); i++) {
+                std::string str = "Light " + std::to_string(i);
+                ImGui::Text(str.c_str());
 
-            col[i][0] = lights_[i].color.x;
-            col[i][1] = lights_[i].color.y;
-            col[i][2] = lights_[i].color.z;
-            str = "Color " + std::to_string(i);
-            ImGui::ColorEdit3(str.c_str(), col[i]);
-            lights_[i].color = XMFLOAT4(col[i][0], col[i][1], col[i][2], lights_[i].color.w);
+                pos[i][0] = lights_[i].pos.x;
+                pos[i][1] = lights_[i].pos.y;
+                pos[i][2] = lights_[i].pos.z;
+                str = "Pos " + std::to_string(i);
+                ImGui::DragFloat3(str.c_str(), pos[i], 1.0f, -115.0f, 115.0f);
+                lights_[i].pos = XMFLOAT4(pos[i][0], pos[i][1], pos[i][2], 1.0f);
 
-            brightness[i] = lights_[i].color.w;
-            str = "Brightness " + std::to_string(i);
-            ImGui::DragFloat(str.c_str(), &brightness[i], 10.0f, 1.0f, 10000.0f);
-            lights_[i].color.w = brightness[i];
+                col[i][0] = lights_[i].color.x;
+                col[i][1] = lights_[i].color.y;
+                col[i][2] = lights_[i].color.z;
+                str = "Color " + std::to_string(i);
+                ImGui::ColorEdit3(str.c_str(), col[i]);
+                lights_[i].color = XMFLOAT4(col[i][0], col[i][1], col[i][2], lights_[i].color.w);
+
+                brightness[i] = lights_[i].color.w;
+                str = "Brightness " + std::to_string(i);
+                ImGui::DragFloat(str.c_str(), &brightness[i], 10.0f, 1.0f, 10000.0f);
+                lights_[i].color.w = brightness[i];
+            }
         }
 
         ImGui::End();

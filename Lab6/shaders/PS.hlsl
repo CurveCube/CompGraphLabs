@@ -100,6 +100,10 @@ float4 main(PS_INPUT input) : SV_TARGET {
     localNorm = (normalize(localNorm) * 2 - 1.0f) * float3(MRONFactors.w, MRONFactors.w, 1.0f);
     normal = localNorm.x * normalize(input.tangent.xyz) + localNorm.y * normalize(binorm) + localNorm.z * normalize(input.normal);
 #endif
+#if defined(SSAO_MASK)
+    float res = calculateOcclusion(input.position, input.worldPos, normalize(normal));
+    return float4(res, res, res, 1.0f);
+#endif
 
     float metallic = MRONFactors.x;
     float roughness = MRONFactors.y;
@@ -113,9 +117,7 @@ float4 main(PS_INPUT input) : SV_TARGET {
     occlusionFactor = 1.0f + MRONFactors.z * (occlusionTexture.Sample(occlusionSampler, texCoords[occlusionTA.y]).x - 1.0f);
 #endif
 #if defined(WITH_SSAO)
-    float res = calculateOcclusion(input.position, normalize(normal));
-    return float4(res, res, res, 1.0f);
-    //occlusionFactor *= calculateOcclusion(input.position, normalize(normal));
+    occlusionFactor *= calculateOcclusion(input.position, input.worldPos, normalize(normal));
 #endif
 
     float4 finalColor = float4(CalculateColor(color.xyz, normalize(normal), input.worldPos.xyz,
