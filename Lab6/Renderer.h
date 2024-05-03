@@ -81,9 +81,12 @@ private:
     ID3D11DepthStencilView* depthStencilView_ = nullptr; // always remains only inside the class #
 
     bool default_ = true;
+    bool shadowSplits_ = false;
     bool excludeTransparent_ = true;
+    bool withSSAO_ = true;
     unsigned int width_ = defaultWidth;
     unsigned int height_ = defaultHeight;
     int mousePrevX_ = -1;
     int mousePrevY_ = -1;
+    XMFLOAT3 dirLightFocus = { 0.0f, 0.0f, 0.0f };
 };

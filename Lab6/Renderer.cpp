@@ -152,30 +152,35 @@ void Renderer::UpdateImgui() {
             switch (cur) {
             case 0:
                 default_ = true;
+                shadowSplits_ = false;
                 //sphere_.SetMode(SimpleObject::DEFAULT);
                 sceneManager_.SetMode(SceneManager::DEFAULT);
                 toneMapping_.ResetEyeAdaptation();
                 break;
             case 1:
                 default_ = false;
+                shadowSplits_ = false;
                 //sphere_.SetMode(SimpleObject::FRESNEL);
                 sceneManager_.SetMode(SceneManager::FRESNEL);
                 toneMapping_.ResetEyeAdaptation();
                 break;
             case 2:
                 default_ = false;
+                shadowSplits_ = false;
                 //sphere_.SetMode(SimpleObject::NDF);
                 sceneManager_.SetMode(SceneManager::NDF);
                 toneMapping_.ResetEyeAdaptation();
                 break;
             case 3:
                 default_ = false;
+                shadowSplits_ = false;
                 //sphere_.SetMode(SimpleObject::GEOMETRY);
                 sceneManager_.SetMode(SceneManager::GEOMETRY);
                 toneMapping_.ResetEyeAdaptation();
                 break;
             case 4:
-                default_ = true;
+                default_ = false;
+                shadowSplits_ = true;
                 sceneManager_.SetMode(SceneManager::SHADOW_SPLITS);
                 toneMapping_.ResetEyeAdaptation();
                 break;
@@ -189,11 +194,29 @@ void Renderer::UpdateImgui() {
         }
 
         if (default_) {
+            if (ImGui::Checkbox("With SSAO", &withSSAO_)) {
+                sceneManager_.WithSSAO(withSSAO_);
+            }
+
             static float factor;
             factor = toneMapping_.GetFactor();
             str = "Exposure factor";
             ImGui::DragFloat(str.c_str(), &factor, 0.01f, 0.0f, 10.0f);
             toneMapping_.SetFactor(factor);
+
+            if (withSSAO_) {
+                static float radius;
+                radius = sceneManager_.GetSSAORadius();
+                str = "SSAO radius";
+                ImGui::DragFloat(str.c_str(), &radius, 0.01f, 0.0f, 10.0f);
+                sceneManager_.SetSSAORadius(radius);
+
+                static float depthLimit;
+                depthLimit = sceneManager_.GetSSAODepthLimit();
+                str = "SSAO depth limit";
+                ImGui::DragFloat(str.c_str(), &depthLimit, 0.001f, 0.0f, 1.0f);
+                sceneManager_.SetSSAODepthLimit(depthLimit);
+            }
         }
 
         /*str = "Object";
@@ -220,33 +243,54 @@ void Renderer::UpdateImgui() {
         ImGui::DragFloat(str.c_str(), &objMetal, 0.01f, 0.0f, 1.0f);
         sphere_.metalness_ = objMetal;*/
 
-        str = "Directional light";
-        ImGui::Text(str.c_str());
+        if (default_ || shadowSplits_) {
+            str = "Directional light";
+            ImGui::Text(str.c_str());
 
-        static float colDir[3];
-        static float brightnessDir;
+            static float colDir[3];
+            static float brightnessDir;
 
-        colDir[0] = dirLight_->color.x;
-        colDir[1] = dirLight_->color.y;
-        colDir[2] = dirLight_->color.z;
-        str = "Color";
-        ImGui::ColorEdit3(str.c_str(), colDir);
+            colDir[0] = dirLight_->color.x;
+            colDir[1] = dirLight_->color.y;
+            colDir[2] = dirLight_->color.z;
+            str = "Color";
+            ImGui::ColorEdit3(str.c_str(), colDir);
 
-        brightnessDir = dirLight_->color.w;
-        str = "Brightness";
-        ImGui::DragFloat(str.c_str(), &brightnessDir, 1.0f, 0.0f, 50.0f);
-        dirLight_->color = XMFLOAT4(colDir[0], colDir[1], colDir[2], brightnessDir);
+            brightnessDir = dirLight_->color.w;
+            str = "Brightness";
+            ImGui::DragFloat(str.c_str(), &brightnessDir, 1.0f, 0.0f, 50.0f);
+            dirLight_->color = XMFLOAT4(colDir[0], colDir[1], colDir[2], brightnessDir);
 
-        str = "Phi";
-        ImGui::DragFloat(str.c_str(), &dirLight_->phi, 0.01f, 0.0f, XM_2PI);
+            str = "Phi";
+            ImGui::DragFloat(str.c_str(), &dirLight_->phi, 0.01f, 0.0f, XM_2PI);
 
-        str = "Theta";
-        ImGui::DragFloat(str.c_str(), &dirLight_->theta, 0.01f, -XM_PIDIV2, XM_PIDIV2);
+            str = "Theta";
+            ImGui::DragFloat(str.c_str(), &dirLight_->theta, 0.01f, -XM_PIDIV2, XM_PIDIV2);
 
-        str = "Distance";
-        ImGui::DragFloat(str.c_str(), &dirLight_->r, 1.0f, 100.0f, 300.0f);
+            str = "Distance";
+            ImGui::DragFloat(str.c_str(), &dirLight_->r, 1.0f, 100.0f, 300.0f);
 
-        dirLight_->Update(camera_->GetFocusPosition());
+            static float focus[3];
+            focus[0] = dirLightFocus.x;
+            focus[1] = dirLightFocus.y;
+            focus[2] = dirLightFocus.z;
+            str = "Directional light focus position";
+            ImGui::DragFloat3(str.c_str(), focus, 1.0f, -115.0f, 115.0f);
+            dirLightFocus = XMFLOAT3(focus[0], focus[1], focus[2]);
+            dirLight_->Update(dirLightFocus);
+
+            static int bias;
+            bias = sceneManager_.GetDepthBias();
+            str = "Shadow depth bias";
+            ImGui::DragInt(str.c_str(), &bias, 1, 0, 32);
+            sceneManager_.SetDepthBias(bias);
+
+            static float slopeScaleBias;
+            slopeScaleBias = sceneManager_.GetSlopeScaleBias();
+            str = "Shadow slope scale bias";
+            ImGui::DragFloat(str.c_str(), &slopeScaleBias, 0.1f, 0.0f, 10.0f);
+            sceneManager_.SetSlopeScaleBias(slopeScaleBias);
+        }
 
         str = "Point lights";
         ImGui::Text(str.c_str());
@@ -305,7 +349,7 @@ bool Renderer::Render() {
 #ifdef _DEBUG
     pAnnotation_->BeginEvent(L"Create_shadow_maps");
 #endif
-    if (default_) {
+    if (default_ || shadowSplits_) {
         if (!sceneManager_.CreateShadowMaps({ 0 })) {
             return false;
         }
@@ -318,6 +362,15 @@ bool Renderer::Render() {
     if (!sceneManager_.PrepareTransparent({ 0 })) {
         return false;
     }
+
+#ifdef _DEBUG
+    pAnnotation_->EndEvent();
+    pAnnotation_->BeginEvent(L"Depth_prepath");
+#endif
+    if (withSSAO_) {
+        sceneManager_.MakeDepthPrepath({ 0 });
+    }
+
 #ifdef _DEBUG
     pAnnotation_->EndEvent();
 #endif
@@ -445,7 +498,6 @@ void Renderer::MoveCamera(int upDown, int rightLeft, int forwardBack) {
         dy = camera_->GetDistanceToFocus() * upDown / 30.0f,
         dz = -camera_->GetDistanceToFocus() * rightLeft / 30.0f;
     camera_->Move(dx, dy, dz);
-    dirLight_->Update(camera_->GetFocusPosition());
 }
 
 void Renderer::OnMouseWheel(int delta) {
@@ -462,7 +514,6 @@ void Renderer::OnMouseMove(int x, int y) {
         camera_->Rotate((mousePrevX_ - x) / 200.0f, (y - mousePrevY_) / 200.0f);
         mousePrevX_ = x;
         mousePrevY_ = y;
-        dirLight_->Update(camera_->GetFocusPosition());
     }
 }
 

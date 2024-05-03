@@ -1,23 +1,23 @@
 #include "shaders/LightCalc.hlsli"
 
 #ifdef HAS_COLOR_TEXTURE
-Texture2D baseColorTexture : register (t7);
+Texture2D baseColorTexture : register (t8);
 SamplerState baseColorSampler : register (s2);
 #endif
 #ifdef HAS_MR_TEXTURE
-Texture2D mrTexture : register (t8);
+Texture2D mrTexture : register (t9);
 SamplerState mrSampler : register (s3);
 #endif
 #ifdef HAS_NORMAL_TEXTURE
-Texture2D normalTexture : register (t9);
+Texture2D normalTexture : register (t10);
 SamplerState normalSampler : register (s4);
 #endif
 #ifdef HAS_OCCLUSION_TEXTURE
-Texture2D occlusionTexture : register (t10);
+Texture2D occlusionTexture : register (t11);
 SamplerState occlusionSampler : register (s5);
 #endif
 #ifdef HAS_EMISSIVE_TEXTURE
-Texture2D emissiveTexture : register (t11);
+Texture2D emissiveTexture : register (t12);
 SamplerState emissiveSampler : register (s6);
 #endif
 
@@ -111,6 +111,11 @@ float4 main(PS_INPUT input) : SV_TARGET {
     float occlusionFactor = 1.0f;
 #if defined(HAS_OCCLUSION_TEXTURE) && defined(DEFAULT)
     occlusionFactor = 1.0f + MRONFactors.z * (occlusionTexture.Sample(occlusionSampler, texCoords[occlusionTA.y]).x - 1.0f);
+#endif
+#if defined(WITH_SSAO)
+    float res = calculateOcclusion(input.position, normalize(normal));
+    return float4(res, res, res, 1.0f);
+    //occlusionFactor *= calculateOcclusion(input.position, normalize(normal));
 #endif
 
     float4 finalColor = float4(CalculateColor(color.xyz, normalize(normal), input.worldPos.xyz,

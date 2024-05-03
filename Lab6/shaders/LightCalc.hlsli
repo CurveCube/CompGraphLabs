@@ -4,12 +4,25 @@
 TextureCube irradianceTexture : register (t0);
 TextureCube prefilteredTexture : register (t1);
 Texture2D brdfTexture : register (t2);
-SamplerState samplerAvg : register (s0);
 Texture2D shadowMaps[4] : register (t3);
+#if defined(WITH_SSAO)
+Texture2D depthTexture : register (t7);
+#endif
+SamplerState samplerAvg : register (s0);
 SamplerComparisonState samplerPcf : register (s1);
 #endif
 
+cbuffer SSAOParamsBuffer : register (b2) {
+    float4 parameters;
+    float4 samples[32];
+    float4x4 invProjectionMatrix;
+    float4x4 projectionMatrix;
+    float4x4 viewMatrix;
+    float4 noise[16];
+};
+
 static float PI = 3.14159265359f;
+static float4x4 M_uv = float4x4(0.5f, 0, 0, 0, 0, -0.5f, 0, 0, 0, 0, 1.0f, 0, 0.5f, 0.5f, 0, 1.0f);
 
 
 float3 fresnelFunction(in float3 objColor, in float3 h, in float3 v, in float metallic) {
@@ -44,7 +57,6 @@ float geometrySmith(in float3 n, in float3 v, in float3 l, in float roughness) {
 #if defined(DEFAULT)
 float4 shadowFactor(in float3 pos) {
     float4 lightProjPos = mul(directionalLight.viewProjectionMatrix, float4(pos, 1.0f));
-    float4x4 M_uv = float4x4(0.5f, 0, 0, 0, 0, -0.5f, 0, 0, 0, 0, 1.0f, 0, 0.5f, 0.5f, 0, 1.0f);
     uint splitSizeRatio[4] = { directionalLight.splitSizeRatio[0], directionalLight.splitSizeRatio[1],
         directionalLight.splitSizeRatio[2], directionalLight.splitSizeRatio[3] };
     int i = 0;
@@ -71,7 +83,42 @@ float4 shadowFactor(in float3 pos) {
 }
 #endif
 
+#if defined(WITH_SSAO)
+float calculateOcclusion(in float4 position, in float3 normal) {
+    int i = ((int)floor(position.x)) % 4;
+    int j = ((int)floor(position.y)) % 4;
+
+    float3 rvec = noise[j * 4 + i].xyz;
+    float3 tangent = normalize(rvec - normal * dot(rvec, normal));
+    float3 bitangent = cross(normal, tangent);
+
+    normal = mul(viewMatrix, float4(normal, 1.0f)).xyz;
+    tangent = mul(viewMatrix, float4(tangent, 1.0f)).xyz;
+    bitangent = mul(viewMatrix, float4(bitangent, 1.0f)).xyz;
+
+    float4 ndc = position / position.w;
+    float4 homoViewPos = mul(invProjectionMatrix, ndc);
+    float3 viewPos = homoViewPos.xyz / homoViewPos.w;
+    int occlusion = 0;
+    for (int k = 0; k < (int)parameters.x; ++k) {
+        float3 samplePos = viewPos + (samples[k].x * tangent + samples[k].y * bitangent + samples[k].z * normal) * parameters.y;
+        float4 samplePosProj = mul(projectionMatrix, float4(samplePos, 1.0f));
+        float3 samplePosNDC = samplePosProj.xyz / samplePosProj.w;
+        float2 samplePosUV = mul(float4(samplePosNDC, 1.0f), M_uv).xy;
+        float sampleDepth = depthTexture.Sample(samplerAvg, samplePosUV).x;
+        if (sampleDepth < samplePosNDC.z && (samplePosNDC.z - sampleDepth) < parameters.z) {
+            ++occlusion;
+        }
+    }
+    return occlusion / parameters.x;
+}
+#endif
+
 float3 CalculateColor(in float3 objColor, in float3 objNormal, in float3 pos, in float roughness, in float metallic, in float occlusionFactor) {
+#if defined(DEFAULT) || defined(SHADOW_SPLITS)
+    float4 shadowFactors = shadowFactor(pos);
+#endif
+#ifndef SHADOW_SPLITS
     float3 viewDir = normalize(cameraPos.xyz - pos);
     float3 finalColor = float3(0.0f, 0.0f, 0.0f);
 #if defined(DEFAULT)
@@ -90,7 +137,6 @@ float3 CalculateColor(in float3 objColor, in float3 objNormal, in float3 pos, in
     finalColor += ambient * occlusionFactor;
 
     float3 lightDir = normalize(directionalLight.lightDir.xyz);
-    float4 shadowFactors = shadowFactor(pos);
     float3 radiance = directionalLight.lightColor.xyz * directionalLight.lightColor.w * shadowFactors.x;
     float3 F = fresnelFunction(objColor, normalize((viewDir + lightDir) / 2.0f), viewDir, metallic);
     float NDF = distributionGGX(objNormal, normalize((viewDir + lightDir) / 2.0f), roughness);
@@ -137,9 +183,10 @@ float3 CalculateColor(in float3 objColor, in float3 objNormal, in float3 pos, in
         finalColor += float3(G, G, G);
 #endif
     }
+#endif
 
 #ifdef SHADOW_SPLITS
-    return finalColor * float3(shadowFactors.y, shadowFactors.z, shadowFactors.w);
+    return float3(shadowFactors.x, shadowFactors.x, shadowFactors.x) * float3(shadowFactors.y, shadowFactors.z, shadowFactors.w);
 #else
     return finalColor;
 #endif

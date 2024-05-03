@@ -20,7 +20,7 @@ struct DirectionalLight {
         XMUINT4 splitSizeRatio;
     };
 
-    float r = 100.0f;
+    float r = 250.0f;
     float theta = 0.595f;
     float phi = 1.3f;
 
@@ -45,9 +45,9 @@ struct DirectionalLight {
         direction = XMFLOAT4(cosf(theta) * cosf(phi), sinf(theta), cosf(theta) * sinf(phi), 0.0f);
 
         float upTheta = theta + XM_PIDIV2;
-        XMMATRIX viewMatrix = XMMatrixLookToRH(
+        XMMATRIX viewMatrix = XMMatrixLookAtRH(
             XMVectorSet(pos.x, pos.y, pos.z, 0.0f),
-            XMVectorSet(-direction.x, -direction.y, -direction.z, 0.0f),
+            XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f),
             XMVectorSet(cosf(upTheta) * cosf(phi), sinf(upTheta), cosf(upTheta) * sinf(phi), 0.0f)
         );
 
@@ -80,9 +80,9 @@ struct DirectionalLight {
         direction = XMFLOAT4(cosf(theta) * cosf(phi), sinf(theta), cosf(theta) * sinf(phi), 0.0f);
 
         float upTheta = theta + XM_PIDIV2;
-        XMMATRIX viewMatrix = XMMatrixLookToRH(
+        XMMATRIX viewMatrix = XMMatrixLookAtRH(
             XMVectorSet(pos.x, pos.y, pos.z, 0.0f),
-            XMVectorSet(-direction.x, -direction.y, -direction.z, 0.0f),
+            XMVectorSet(focus.x, focus.y, focus.z, 0.0f),
             XMVectorSet(cosf(upTheta) * cosf(phi), sinf(upTheta), cosf(upTheta) * sinf(phi), 0.0f)
         );
 
@@ -92,8 +92,8 @@ struct DirectionalLight {
     };
 
 private:
-    float baseWidth_ = 75.0f;
-    float baseHeight_ = 75.0f;
+    float baseWidth_ = 100.0f;
+    float baseHeight_ = 100.0f;
     float baseNear_ = 0.01f;
     float baseFar_ = 1000.0f;
 };
