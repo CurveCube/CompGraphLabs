@@ -87,16 +87,16 @@ float4 shadowFactor(in float3 pos) {
 
 #if defined(WITH_SSAO) || defined(SSAO_MASK)
 float calculateOcclusion(in float4 position, in float4 worldPos, in float3 normal) {
-    int i = ((int)floor((position.x * 0.5 + 0.5) + sizes.x)) % 4;
-    int j = ((int)floor((position.y * 0.5 + 0.5) + sizes.y)) % 4;
+    int i = ((int)floor((position.x / position.w * 0.5 + 0.5) * sizes.x)) % 4;
+    int j = ((int)floor((position.y / position.w * 0.5 + 0.5) * sizes.y)) % 4;
 
     float3 rvec = noise[j * 4 + i].xyz;
     float3 tangent = normalize(rvec - normal * dot(rvec, normal));
     float3 bitangent = cross(normal, tangent);
 
-    normal = mul(viewMatrix, float4(normal, 1.0f)).xyz;
-    tangent = mul(viewMatrix, float4(tangent, 1.0f)).xyz;
-    bitangent = mul(viewMatrix, float4(bitangent, 1.0f)).xyz;
+    normal = mul(viewMatrix, float4(normal, 0.0f)).xyz;
+    tangent = mul(viewMatrix, float4(tangent, 0.0f)).xyz;
+    bitangent = mul(viewMatrix, float4(bitangent, 0.0f)).xyz;
 
     float3 viewPos = mul(viewMatrix, worldPos).xyz;
     int occlusion = 0;
@@ -104,13 +104,13 @@ float calculateOcclusion(in float4 position, in float4 worldPos, in float3 norma
         float3 samplePos = viewPos + (samples[k].x * tangent + samples[k].y * bitangent + samples[k].z * normal) * parameters.y;
         float4 samplePosProj = mul(projectionMatrix, float4(samplePos, 1.0f));
         float3 samplePosNDC = samplePosProj.xyz / samplePosProj.w;
-        float2 samplePosUV = mul(float4(samplePosNDC, 1.0f), M_uv).xy;
+        float2 samplePosUV = float2(samplePosNDC.x * 0.5 + 0.5, 0.5 - 0.5 * samplePosNDC.y);
         float sampleDepth = depthTexture.Sample(samplerAvg, samplePosUV).x;
-        if (sampleDepth < samplePosNDC.z && abs(samplePosNDC.z - sampleDepth) < parameters.z) {
+        if (sampleDepth < samplePosNDC.z || abs(samplePosNDC.z - sampleDepth) > parameters.z) {
             ++occlusion;
         }
     }
-    return 1.0f - occlusion / parameters.x;
+    return occlusion / parameters.x;
 }
 #endif
 
