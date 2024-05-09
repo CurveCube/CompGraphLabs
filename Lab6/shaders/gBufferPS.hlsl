@@ -1,24 +1,22 @@
-#include "shaders/LightCalc.hlsli"
-
 #ifdef HAS_COLOR_TEXTURE
-Texture2D baseColorTexture : register (t8);
-SamplerState baseColorSampler : register (s2);
+Texture2D baseColorTexture : register (t0);
+SamplerState baseColorSampler : register (s0);
 #endif
 #ifdef HAS_MR_TEXTURE
-Texture2D mrTexture : register (t9);
-SamplerState mrSampler : register (s3);
+Texture2D mrTexture : register (t1);
+SamplerState mrSampler : register (s1);
 #endif
 #ifdef HAS_NORMAL_TEXTURE
-Texture2D normalTexture : register (t10);
-SamplerState normalSampler : register (s4);
+Texture2D normalTexture : register (t2);
+SamplerState normalSampler : register (s2);
 #endif
 #ifdef HAS_OCCLUSION_TEXTURE
-Texture2D occlusionTexture : register (t11);
-SamplerState occlusionSampler : register (s5);
+Texture2D occlusionTexture : register (t3);
+SamplerState occlusionSampler : register (s3);
 #endif
 #ifdef HAS_EMISSIVE_TEXTURE
-Texture2D emissiveTexture : register (t12);
-SamplerState emissiveSampler : register (s6);
+Texture2D emissiveTexture : register (t4);
+SamplerState emissiveSampler : register (s4);
 #endif
 
 cbuffer MaterialParamsBuffer : register (b0) {
@@ -59,7 +57,16 @@ struct PS_INPUT {
 #endif
 };
 
-float4 main(PS_INPUT input) : SV_TARGET {
+struct PS_OUTPUT {
+    float4 color : SV_TARGET0;
+    float4 feature : SV_TARGET1;
+    float4 normal : SV_TARGET2;
+    float4 emissive : SV_TARGET3;
+};
+
+PS_OUTPUT main(PS_INPUT input) : SV_TARGET {
+    PS_OUTPUT output;
+
 #if defined(HAS_COLOR_TEXTURE) || defined(HAS_MR_TEXTURE) || defined(HAS_NORMAL_TEXTURE) || defined(HAS_OCCLUSION_TEXTURE) || defined(HAS_EMISSIVE_TEXTURE)
     float2 texCoords[] = {
     #ifdef HAS_TEXCOORD_0
@@ -92,6 +99,19 @@ float4 main(PS_INPUT input) : SV_TARGET {
         discard;
     }
 #endif
+    output.color = color;
+
+    float occlusion = 1.0f;
+    float roughness = MRONFactors.y;
+    float metallic = MRONFactors.x;
+#ifdef HAS_MR_TEXTURE
+    roughness *= mrTexture.Sample(mrSampler, texCoords[roughMetallicTA.y]).y;
+    metallic *= mrTexture.Sample(mrSampler, texCoords[roughMetallicTA.y]).z;
+#endif
+#ifdef HAS_OCCLUSION_TEXTURE
+    occlusion = 1.0f + MRONFactors.z * (occlusionTexture.Sample(occlusionSampler, texCoords[occlusionTA.y]).x - 1.0f);
+#endif
+    output.feature = float4(occlusion, roughness, metallic, 0.04f);
 
     float3 normal = input.normal;
 #if defined(HAS_NORMAL_TEXTURE) && defined(HAS_TANGENT)
@@ -100,31 +120,13 @@ float4 main(PS_INPUT input) : SV_TARGET {
     localNorm = (normalize(localNorm) * 2 - 1.0f) * float3(MRONFactors.w, MRONFactors.w, 1.0f);
     normal = localNorm.x * normalize(input.tangent.xyz) + localNorm.y * normalize(binorm) + localNorm.z * normalize(input.normal);
 #endif
-#if defined(SSAO_MASK)
-    float res = calculateOcclusion(input.position, input.worldPos, normalize(normal));
-    return float4(res, res, res, 1.0f);
-#endif
+    output.normal = float4(normal * 0.5f + 0.5f, 0.0f);
 
-    float metallic = MRONFactors.x;
-    float roughness = MRONFactors.y;
-#ifdef HAS_MR_TEXTURE
-    metallic *= mrTexture.Sample(mrSampler, texCoords[roughMetallicTA.y]).z;
-    roughness *= mrTexture.Sample(mrSampler, texCoords[roughMetallicTA.y]).y;
+    float4 emissive = float4(0.0f, 0.0f, 0.0f, 0.0f);
+#if defined(HAS_EMISSIVE_TEXTURE)
+    emissive = float4(emissiveFactorAlphaCutoff.xyz * emissiveTexture.Sample(emissiveSampler, texCoords[emissiveTA.y]).xyz, 0.0f);
 #endif
+    output.emissive = emissive;
 
-    float occlusionFactor = 1.0f;
-#if defined(HAS_OCCLUSION_TEXTURE) && defined(DEFAULT)
-    occlusionFactor = 1.0f + MRONFactors.z * (occlusionTexture.Sample(occlusionSampler, texCoords[occlusionTA.y]).x - 1.0f);
-#endif
-#if defined(WITH_SSAO)
-    occlusionFactor *= calculateOcclusion(input.position, input.worldPos, normalize(normal));
-#endif
-
-    float4 finalColor = float4(CalculateColor(color.xyz, normalize(normal), input.worldPos.xyz,
-        clamp(roughness, 0.0001f, 1.0f), clamp(metallic, 0.0f, 1.0f), clamp(occlusionFactor, 0.0f, 1.0f)), color.w);
-#if defined(HAS_EMISSIVE_TEXTURE) && defined(DEFAULT)
-    finalColor += float4(emissiveFactorAlphaCutoff.xyz * emissiveTexture.Sample(emissiveSampler, texCoords[emissiveTA.y]).xyz, 0.0f);
-#endif
-
-    return finalColor;
+    return output;
 }

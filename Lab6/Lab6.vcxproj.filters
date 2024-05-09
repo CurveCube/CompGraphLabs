@@ -47,6 +47,18 @@
     <Filter Include="Исходные файлы\Менеджеры">
       <UniqueIdentifier>{2c7c76bd-8ab5-43e2-a74c-f51dcd69089f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\CubemapGenerator">
+      <UniqueIdentifier>{a8aeb489-b7de-465c-97a3-a51a8a28f381}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\ToneMapping">
+      <UniqueIdentifier>{c8b73427-146d-440d-a628-e80dfcab27ed}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Scene">
+      <UniqueIdentifier>{2425ccaa-ff8d-4f88-89b6-264f5b304a5c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Scene\Cubemap">
+      <UniqueIdentifier>{eeb8ba04-9cc4-46ec-8442-bae64b77d17d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="imgui\imgui_tables.cpp">
@@ -177,9 +189,6 @@
     <ClInclude Include="Light.hpp">
       <Filter>Файлы заголовков\Сцена</Filter>
     </ClInclude>
-    <ClInclude Include="SimpleObject.hpp">
-      <Filter>Файлы заголовков\Отрисовщик</Filter>
-    </ClInclude>
     <ClInclude Include="Renderer.h">
       <Filter>Файлы заголовков\Отрисовщик</Filter>
     </ClInclude>
@@ -204,71 +213,68 @@
     <None Include="imgui\imgui.ini">
       <Filter>Файлы ресурсов</Filter>
     </None>
-    <None Include="shaders\brdfPS.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="shaders\brightnessPS.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="shaders\cubemapGeneratorIrradiancePS.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="shaders\cubemapGeneratorPS.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="shaders\cubemapGeneratorVS.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="shaders\cubemapPS.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="shaders\cubemapVS.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="shaders\downsamplePS.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="shaders\mappingVS.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="shaders\prefilteredColorPS.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="shaders\SceneMatrixBuffer.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="shaders\tonemapPS.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="shaders\SimpleLightCalc.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="shaders\SimpleSceneMatrixBuffer.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="shaders\LightCalc.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="shaders\downsampleOnlyMaxPS.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="shaders\PS.hlsl">
-      <Filter>Shaders</Filter>
+    <None Include="shaders\VS.hlsl">
+      <Filter>Shaders\Scene</Filter>
     </None>
     <None Include="shaders\shadowPS.hlsl">
-      <Filter>Shaders</Filter>
+      <Filter>Shaders\Scene</Filter>
     </None>
-    <None Include="shaders\shadowVS.hlsl">
-      <Filter>Shaders</Filter>
+    <None Include="shaders\forwardRenderPS.hlsl">
+      <Filter>Shaders\Scene</Filter>
     </None>
-    <None Include="shaders\simplePS.hlsl">
-      <Filter>Shaders</Filter>
+    <None Include="shaders\LightCalc.hlsli">
+      <Filter>Shaders\Scene</Filter>
     </None>
-    <None Include="shaders\simpleVS.hlsl">
-      <Filter>Shaders</Filter>
+    <None Include="shaders\downsampleWithMaxPS.hlsl">
+      <Filter>Shaders\Scene</Filter>
     </None>
-    <None Include="shaders\VS.hlsl">
-      <Filter>Shaders</Filter>
+    <None Include="shaders\tonemapPS.hlsl">
+      <Filter>Shaders\ToneMapping</Filter>
+    </None>
+    <None Include="shaders\mappingVS.hlsl">
+      <Filter>Shaders\ToneMapping</Filter>
+    </None>
+    <None Include="shaders\downsamplePS.hlsl">
+      <Filter>Shaders\ToneMapping</Filter>
+    </None>
+    <None Include="shaders\brightnessPS.hlsl">
+      <Filter>Shaders\ToneMapping</Filter>
+    </None>
+    <None Include="shaders\cubemapVS.hlsl">
+      <Filter>Shaders\Scene\Cubemap</Filter>
+    </None>
+    <None Include="shaders\cubemapPS.hlsl">
+      <Filter>Shaders\Scene\Cubemap</Filter>
+    </None>
+    <None Include="shaders\brdfPS.hlsl">
+      <Filter>Shaders\CubemapGenerator</Filter>
+    </None>
+    <None Include="shaders\cubemapGeneratorIrradiancePS.hlsl">
+      <Filter>Shaders\CubemapGenerator</Filter>
+    </None>
+    <None Include="shaders\cubemapGeneratorPS.hlsl">
+      <Filter>Shaders\CubemapGenerator</Filter>
+    </None>
+    <None Include="shaders\cubemapGeneratorVS.hlsl">
+      <Filter>Shaders\CubemapGenerator</Filter>
+    </None>
+    <None Include="shaders\prefilteredColorPS.hlsl">
+      <Filter>Shaders\CubemapGenerator</Filter>
+    </None>
+    <None Include="shaders\PBR.hlsli">
+      <Filter>Shaders\Scene</Filter>
+    </None>
+    <None Include="shaders\pointLightPS.hlsl">
+      <Filter>Shaders\Scene</Filter>
+    </None>
+    <None Include="shaders\gBufferPS.hlsl">
+      <Filter>Shaders\Scene</Filter>
+    </None>
+    <None Include="shaders\directionalEmissiveLightPS.hlsl">
+      <Filter>Shaders\Scene</Filter>
+    </None>
+    <None Include="shaders\ambientLightPS.hlsl">
+      <Filter>Shaders\Scene</Filter>
     </None>
   </ItemGroup>
 </Project>

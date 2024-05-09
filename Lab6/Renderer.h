@@ -12,13 +12,11 @@
 #include <vector>
 #include <string>
 
-// #include "SimpleObject.hpp" // temporary, will be replaced with scene
-
 
 class Renderer {
 public:
-    static constexpr UINT defaultWidth = 1280;
-    static constexpr UINT defaultHeight = 720;
+    static constexpr int defaultWidth = 1280;
+    static constexpr int defaultHeight = 720;
 
     Renderer(const Renderer&) = delete;
     Renderer(Renderer&&) = delete;
@@ -39,11 +37,11 @@ public:
     };
 
 private:
-    Renderer() : width_(defaultWidth), height_(defaultHeight) {
+    Renderer() {
         viewport_.TopLeftX = 0;
         viewport_.TopLeftY = 0;
-        viewport_.Width = width_;
-        viewport_.Height = height_;
+        viewport_.Width = defaultWidth;
+        viewport_.Height = defaultHeight;
         viewport_.MinDepth = 0.0f;
         viewport_.MaxDepth = 1.0f;
     };
@@ -52,41 +50,38 @@ private:
     HRESULT GenerateTextures();
     void UpdateImgui();
 
-    D3D11_VIEWPORT viewport_;
-
     std::shared_ptr<IDXGIFactory> factory_; // transmitted outward ->
     std::shared_ptr<IDXGIAdapter> selectedAdapter_; // transmitted outward ->
+#ifdef _DEBUG
+    std::shared_ptr<ID3DUserDefinedAnnotation> annotation_; // transmitted outward ->
+#endif // _DEBUG
+
     std::shared_ptr<Device> device_; // transmitted outward ->
     std::shared_ptr<Camera> camera_; // transmitted outward ->
     std::shared_ptr<ManagerStorage> managerStorage_; // transmitted outward ->
     std::shared_ptr<Skybox> skybox_; // transmitted outward ->
+
+    SwapChain swapChain_;
+    ToneMapping toneMapping_;
+    SceneManager sceneManager_;
 
     std::shared_ptr<ID3D11ShaderResourceView> environmentMap_; // transmitted outward ->
     std::shared_ptr<ID3D11ShaderResourceView> irradianceMap_; // transmitted outward ->
     std::shared_ptr<ID3D11ShaderResourceView> prefilteredMap_; // transmitted outward ->
     std::shared_ptr<ID3D11ShaderResourceView> BRDF_; // transmitted outward ->
 
-    SwapChain swapChain_;
-    ToneMapping toneMapping_;
-    SceneManager sceneManager_;
-    // SimpleObject sphere_;
-
-    std::vector<SpotLight> lights_;
+    std::vector<PointLight> lights_;
     std::shared_ptr<DirectionalLight> dirLight_; // transmitted outward ->
 
-#ifdef _DEBUG
-    ID3DUserDefinedAnnotation* pAnnotation_ = nullptr; // always remains only inside the class #
-#endif // _DEBUG
-    ID3D11Texture2D* depthBuffer_ = nullptr; // always remains only inside the class #
-    ID3D11DepthStencilView* depthStencilView_ = nullptr; // always remains only inside the class #
+    D3D11_VIEWPORT viewport_;
+    int width_ = defaultWidth;
+    int height_ = defaultHeight;
 
     bool default_ = true;
     bool shadowSplits_ = false;
-    bool excludeTransparent_ = true;
-    bool withSSAO_ = true;
-    unsigned int width_ = defaultWidth;
-    unsigned int height_ = defaultHeight;
+    
     int mousePrevX_ = -1;
     int mousePrevY_ = -1;
+
     XMFLOAT3 dirLightFocus = { 0.0f, 0.0f, 0.0f };
 };

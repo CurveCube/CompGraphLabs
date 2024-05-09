@@ -7,6 +7,10 @@
 
 
 namespace {
+    std::string GenerateKey(D3D11_BLEND srcBlend, D3D11_BLEND destBlend, D3D11_BLEND_OP op) {
+        return std::to_string(srcBlend) + "_" + std::to_string(destBlend) + "_" + std::to_string(op);
+    };
+
     std::string GenerateKey(D3D11_FILTER filter, D3D11_TEXTURE_ADDRESS_MODE modeU,
         D3D11_TEXTURE_ADDRESS_MODE modeV, D3D11_TEXTURE_ADDRESS_MODE modeW, D3D11_COMPARISON_FUNC compFunc) {
         return std::to_string(filter) + "_" + std::to_string(modeU) + "_" + std::to_string(modeV) + "_" + std::to_string(modeW) + "_" + std::to_string(compFunc);
@@ -27,12 +31,13 @@ class StateManager {
 public:
     StateManager(const std::shared_ptr<Device>& devicePtr) : device_(devicePtr) {};
 
-    bool CheckBlendState() const {
-        return !!blendState_;
+    bool CheckBlendState(D3D11_BLEND srcBlend = D3D11_BLEND_SRC_ALPHA, D3D11_BLEND destBlend = D3D11_BLEND_INV_SRC_ALPHA, D3D11_BLEND_OP op = D3D11_BLEND_OP_ADD) const {
+        return blendStates_.find(GenerateKey(srcBlend, destBlend, op)) != blendStates_.end();
     };
 
-    HRESULT CreateBlendState(std::shared_ptr<ID3D11BlendState>& object) {
-        if (SUCCEEDED(GetBlendState(object))) {
+    HRESULT CreateBlendState(std::shared_ptr<ID3D11BlendState>& object, D3D11_BLEND srcBlend = D3D11_BLEND_SRC_ALPHA, D3D11_BLEND destBlend = D3D11_BLEND_INV_SRC_ALPHA,
+        D3D11_BLEND_OP op = D3D11_BLEND_OP_ADD) {
+        if (SUCCEEDED(GetBlendState(object, srcBlend, destBlend, op))) {
             return S_OK;
         }
 
@@ -40,9 +45,9 @@ public:
         desc.AlphaToCoverageEnable = false;
         desc.IndependentBlendEnable = false;
         desc.RenderTarget[0].BlendEnable = true;
-        desc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-        desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
-        desc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+        desc.RenderTarget[0].BlendOp = op;
+        desc.RenderTarget[0].DestBlend = destBlend;
+        desc.RenderTarget[0].SrcBlend = srcBlend;
         desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_RED |
             D3D11_COLOR_WRITE_ENABLE_GREEN | D3D11_COLOR_WRITE_ENABLE_BLUE;
         desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
@@ -53,28 +58,30 @@ public:
         HRESULT result = device_->GetDevice()->CreateBlendState(&desc, &blendState);
         if (SUCCEEDED(result)) {
             object = std::shared_ptr<ID3D11BlendState>(blendState, utilities::DXPtrDeleter<ID3D11BlendState*>);
-            blendState_ = object;
+            blendStates_.emplace(GenerateKey(srcBlend, destBlend, op), object);
         }
         return result;
     };
 
-    HRESULT CreateBlendState() {
+    HRESULT CreateBlendState(D3D11_BLEND srcBlend = D3D11_BLEND_SRC_ALPHA, D3D11_BLEND destBlend = D3D11_BLEND_INV_SRC_ALPHA, D3D11_BLEND_OP op = D3D11_BLEND_OP_ADD) {
         std::shared_ptr<ID3D11BlendState> object;
-        return CreateBlendState(object);
+        return CreateBlendState(object, srcBlend, destBlend, op);
     };
 
-    HRESULT GetBlendState(std::shared_ptr<ID3D11BlendState>& object) const {
-        if (CheckBlendState()) {
-            object = blendState_;
-            return S_OK;
+    HRESULT GetBlendState(std::shared_ptr<ID3D11BlendState>& object, D3D11_BLEND srcBlend = D3D11_BLEND_SRC_ALPHA, D3D11_BLEND destBlend = D3D11_BLEND_INV_SRC_ALPHA,
+        D3D11_BLEND_OP op = D3D11_BLEND_OP_ADD) const {
+        auto result = blendStates_.find(GenerateKey(srcBlend, destBlend, op));
+        if (result == blendStates_.end()) {
+            return E_FAIL;
         }
         else {
-            return E_FAIL;
+            object = result->second;
+            return S_OK;
         }
     };
 
     void ClearBlendState() {
-        blendState_.reset();
+        blendStates_.clear();
     };
 
     bool CheckSamplerState(D3D11_FILTER filter, D3D11_TEXTURE_ADDRESS_MODE modeU = D3D11_TEXTURE_ADDRESS_WRAP,
@@ -249,7 +256,7 @@ public:
 
 private:
     std::shared_ptr<Device> device_; // provided externally <-
-    std::shared_ptr<ID3D11BlendState> blendState_; // transmitted outward ->
+    std::map<std::string, std::shared_ptr<ID3D11BlendState>> blendStates_; // states are transmitted outward ->
     std::map<std::string, std::shared_ptr<ID3D11SamplerState>> samplerStates_; // states are transmitted outward ->
     std::map<std::string, std::shared_ptr<ID3D11DepthStencilState>> depthStencilStates_; // states are transmitted outward ->
     std::map<std::string, std::shared_ptr<ID3D11RasterizerState>> rasterizerStates_; // states are transmitted outward ->

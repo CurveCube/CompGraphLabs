@@ -55,9 +55,8 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="Scene.h" />
     <None Include="shaders\LightCalc.hlsli" />
-    <None Include="shaders\SceneMatrixBuffer.hlsli" />
+    <None Include="shaders\PBR.hlsli" />
     <ClInclude Include="ShaderManagers.hpp" />
-    <ClInclude Include="SimpleObject.hpp" />
     <ClInclude Include="SkyBox.h" />
     <ClInclude Include="StateManager.hpp" />
     <ClInclude Include="SwapChain.hpp" />
@@ -110,34 +109,37 @@
     <None Include="shaders\prefilteredColorPS.hlsl">
       <FileType>Document</FileType>
     </None>
-    <None Include="shaders\SimpleLightCalc.hlsli" />
-    <None Include="shaders\SimpleSceneMatrixBuffer.hlsli" />
     <None Include="shaders\tonemapPS.hlsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>
   <ItemGroup>
-    <None Include="shaders\downsampleOnlyMaxPS.hlsl">
+    <None Include="shaders\downsampleWithMaxPS.hlsl">
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
       <FileType>Document</FileType>
     </None>
-    <None Include="shaders\PS.hlsl">
+    <None Include="shaders\forwardRenderPS.hlsl">
       <FileType>Document</FileType>
     </None>
     <None Include="shaders\shadowPS.hlsl">
       <FileType>Document</FileType>
     </None>
-    <None Include="shaders\shadowVS.hlsl">
-      <FileType>Document</FileType>
-    </None>
-    <None Include="shaders\simplePS.hlsl">
-      <FileType>Document</FileType>
-    </None>
-    <None Include="shaders\simpleVS.hlsl">
-      <FileType>Document</FileType>
-    </None>
     <None Include="shaders\VS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\ambientLightPS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\directionalEmissiveLightPS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\gBufferPS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="shaders\pointLightPS.hlsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>

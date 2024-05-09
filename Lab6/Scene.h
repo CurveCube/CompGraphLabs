@@ -37,15 +37,17 @@ class SceneManager {
         std::vector<Attribute> attributes;
         int indicesAccessorId = 0;
         std::shared_ptr<VertexShader> VS;
-        std::shared_ptr<PixelShader> PSDefault;
-        std::shared_ptr<PixelShader> PSFresnel;
-        std::shared_ptr<PixelShader> PSNdf;
-        std::shared_ptr<PixelShader> PSGeometry;
-        std::shared_ptr<PixelShader> PSShadowSplits;
-        std::shared_ptr<PixelShader> PSSSAO;
-        std::shared_ptr<PixelShader> PSSSAOMask;
+        std::shared_ptr<PixelShader> gBufferPS; // only for deferred render
+        std::shared_ptr<PixelShader> PSDefault; // only for forward render
+        std::shared_ptr<PixelShader> PSFresnel; // only for forward render
+        std::shared_ptr<PixelShader> PSNdf; // only for forward render
+        std::shared_ptr<PixelShader> PSGeometry; // only for forward render
+        std::shared_ptr<PixelShader> PSShadowSplits; // only for forward render
+        std::shared_ptr<PixelShader> PSSSAOMask; // only for forward render
+        std::shared_ptr<PixelShader> transparentPSSSAO; // only for transparent
+        std::shared_ptr<PixelShader> transparentPSSSAOMask; // only for transparent
         std::shared_ptr<VertexShader> shadowVS;
-        std::shared_ptr<PixelShader> shadowPS;
+        std::shared_ptr<PixelShader> shadowPS; // only for alpha cutoff
     };
 
     struct TextureAccessor {
@@ -121,12 +123,30 @@ class SceneManager {
         XMMATRIX worldMatrix;
     };
 
+    struct InstancingWorldMatrixBuffer {
+        XMMATRIX worldMatrix[MAX_LIGHT];
+    };
+
     struct ViewMatrixBuffer {
         XMMATRIX viewProjectionMatrix;
-        XMFLOAT4 cameraPos;
-        XMINT4 lightParams;
-        DirectionalLight::DirectionalLightInfo directionalLight;
-        SpotLight lights[MAX_LIGHT];
+    };
+
+    struct ShadowMapAlphaCutoffBuffer {
+        XMFLOAT4 baseColorFactor;
+        XMFLOAT4 alphaCutoffTexCoord;
+    };
+
+    struct LightBuffer {
+        XMFLOAT4 parameters[MAX_LIGHT];
+        XMFLOAT4 pos[MAX_LIGHT];
+        XMFLOAT4 color[MAX_LIGHT];
+    };
+
+    struct DirectionalLightBuffer {
+        XMFLOAT4 direction;
+        XMFLOAT4 color;
+        XMMATRIX viewProjectionMatrix;
+        XMUINT4 splitSizeRatio;
     };
 
     struct MaterialParamsBuffer {
@@ -140,21 +160,25 @@ class SceneManager {
         XMINT4 occlusionTA;
     };
 
-    struct ShadowMapViewMatrixBuffer {
+    struct ForwardRenderViewMatrixBuffer {
         XMMATRIX viewProjectionMatrix;
+        XMINT4 lightParams;
+        DirectionalLight::DirectionalLightInfo directionalLight;
+        PointLight lights[MAX_LIGHT];
     };
 
-    struct ShadowMapAlphaCutoffBuffer {
-        XMFLOAT4 baseColorFactor;
-        XMFLOAT4 alphaCutoffTexCoord;
+    struct MatricesBuffer {
+        XMFLOAT4 cameraPos;
+        XMMATRIX projectionMatrix;
+        XMMATRIX invProjectionMatrix;
+        XMMATRIX viewMatrix;
+        XMMATRIX invViewMatrix;
     };
 
     struct SSAOParamsBuffer {
         XMFLOAT4 parameters;
         XMFLOAT4 sizes;
         XMFLOAT4 samples[MAX_SSAO_SAMPLE_COUNT];
-        XMMATRIX projectionMatrix;
-        XMMATRIX viewMatrix;
         XMFLOAT4 noise[NOISE_BUFFER_SIZE];
     };
 
@@ -164,8 +188,18 @@ class SceneManager {
         ID3D11ShaderResourceView* SRV = nullptr;
     };
 
+    struct RawPtrDepthBuffer {
+        ID3D11Texture2D* texture = nullptr;
+        ID3D11DepthStencilView* DSV = nullptr;
+        ID3D11ShaderResourceView* SRV = nullptr;
+    };
+
+    struct SphereVertex {
+        XMFLOAT3 pos;
+    };
+
 public:
-    enum Mode {
+    enum class Mode {
         DEFAULT,
         FRESNEL,
         NDF,
@@ -174,65 +208,56 @@ public:
         SSAO_MASK
     };
 
+    // general settings
+    bool excludeTransparent = true;
+    bool deferredRender = true;
+
+    // default mode settings
+    bool withSSAO = true;
+
+    // shadows settings
+    int depthBias = 4;
+    float slopeScaleBias = 2 * sqrt(2);
+
+    // SSAO settings
+    float SSAODepthLimit = 0.000001f;
+    float SSAORadius = 2.1f;
+
+    // deferred render point light settings
+    float smoothClampRadianceLimit = 1.0f;
+    float clampRadianceLimit = 0.5f;
+
     SceneManager();
 
     HRESULT Init(const std::shared_ptr<Device>& device, const std::shared_ptr<ManagerStorage>& managerStorage,
-        const std::shared_ptr<Camera>& camera, const std::shared_ptr<DirectionalLight>& directionalLight, int width, int height);
+        const std::shared_ptr<Camera>& camera, const std::shared_ptr<DirectionalLight>& directionalLight, int width, int height,
+        const std::shared_ptr<ID3DUserDefinedAnnotation>& annotation = nullptr);
     HRESULT LoadScene(const std::string& name, UINT& index, UINT& count, const XMMATRIX& transformation = XMMatrixIdentity());
-    bool CreateShadowMaps(const std::vector<int>& sceneIndices);
-    bool PrepareTransparent(const std::vector<int>& sceneIndices);
     bool Render(
         const std::shared_ptr<ID3D11ShaderResourceView>& irradianceMap,
         const std::shared_ptr<ID3D11ShaderResourceView>& prefilteredMap,
         const std::shared_ptr<ID3D11ShaderResourceView>& BRDF,
         const std::shared_ptr<Skybox>& skybox,
-        const std::vector<SpotLight>& lights,
+        const std::vector<PointLight>& lights,
         const std::vector<int>& sceneIndices
     );
-    bool MakeDepthPrepath(const std::vector<int>& sceneIndices);
     bool Resize(int width, int height);
-    void SetMode(Mode mode);
-    bool IsInit() const;
     void Cleanup();
 
-    void ExcludeTransparent(bool exclude) {
-        excludeTransparent_ = exclude;
+    void SetMode(Mode mode) {
+        currentMode_ = mode;
     };
 
-    void SetDepthBias(int bias) {
-        depthBias_ = bias;
+    void SetRenderTarget(const std::shared_ptr<ID3D11RenderTargetView>& renderTarget) {
+        renderTarget_ = renderTarget;
     };
 
-    void SetSlopeScaleBias(float slopeScaleBias) {
-        slopeScaleBias_ = slopeScaleBias;
+    void SetViewport(const D3D11_VIEWPORT& viewport) {
+        renderTargetViewport_ = viewport;
     };
 
-    int GetDepthBias() {
-        return depthBias_;
-    };
-
-    float GetSlopeScaleBias() {
-        return slopeScaleBias_;
-    };
-
-    void WithSSAO(bool active) {
-        withSSAO_ = active;
-    };
-
-    float GetSSAODepthLimit() {
-        return SSAODepthLimit_;
-    };
-
-    float GetSSAORadius() {
-        return SSAORadius_;
-    };
-
-    void SetSSAODepthLimit(float limit) {
-        SSAODepthLimit_ = limit;
-    };
-
-    void SetSSAORadius(float radius) {
-        SSAORadius_ = radius;
+    bool IsInit() const {
+        return isInit_;
     };
 
     ~SceneManager() {
@@ -240,10 +265,15 @@ public:
     };
 
 private:
-    HRESULT CreateDepthStencilView(int width, int height, ID3D11Texture2D** buffer, ID3D11DepthStencilView** DSV, ID3D11ShaderResourceView** SRV);
-    HRESULT CreateAuxiliaryForTransparent(int width, int height);
+    HRESULT GenerateSphere();
+    HRESULT CreateDepthStencilView(int width, int height, RawPtrDepthBuffer& buffer);
+    HRESULT CreateAuxiliaryForDeferredRender();
+    HRESULT CreateAuxiliaryForShadowMaps();
+    HRESULT CreateAuxiliaryForTransparent();
+    HRESULT CreateTexture(RawPtrTexture& texture, int width, int height, DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM);
     HRESULT CreateTexture(RawPtrTexture& texture, int i);
     HRESULT CreateBuffers();
+
     HRESULT CreateBufferAccessors(const tinygltf::Model& model, SceneArrays& arrays);
     HRESULT CreateSamplers(const tinygltf::Model& model, SceneArrays& arrays);
     HRESULT CreateTextures(const tinygltf::Model& model, SceneArrays& arrays, const std::string& gltfFileName);
@@ -260,8 +290,11 @@ private:
         std::vector<Attribute>& attributes, std::vector<std::string>& baseDefines, std::vector<D3D11_INPUT_ELEMENT_DESC>& desc);
     HRESULT CreateShaders(Primitive& primitive, const SceneArrays& arrays,
         const std::vector<std::string>& baseDefines, const std::vector<D3D11_INPUT_ELEMENT_DESC>& desc);
+
+    bool CreateShadowMaps(const std::vector<int>& sceneIndices);
     bool CreateShadowMapForNode(int arrayId, int nodeId, const XMMATRIX& transformation = XMMatrixIdentity());
     bool CreateShadowMapForPrimitive(int arrayId, const Primitive& primitive, AlphaMode mode, const XMMATRIX& transformation);
+    bool PrepareTransparent(const std::vector<int>& sceneIndices);
     bool PrepareTransparentForNode(int arrayId, int nodeId, const XMMATRIX& transformation = XMMatrixIdentity());
     bool AddPrimitiveToTransparentPrimitives(int arrayId, const Primitive& primitive, const XMMATRIX& transformation);
     void RenderNode(
@@ -278,74 +311,107 @@ private:
         const std::shared_ptr<ID3D11ShaderResourceView>& irradianceMap,
         const std::shared_ptr<ID3D11ShaderResourceView>& prefilteredMap,
         const std::shared_ptr<ID3D11ShaderResourceView>& BRDF,
-        const XMMATRIX& transformation
+        const XMMATRIX& transformation,
+        bool transparent = false
     );
     void RenderTransparent(
         const std::shared_ptr<ID3D11ShaderResourceView>& irradianceMap,
         const std::shared_ptr<ID3D11ShaderResourceView>& prefilteredMap,
         const std::shared_ptr<ID3D11ShaderResourceView>& BRDF
     );
-    void MakeDepthPrepathForNode(int arrayId, int nodeId, const XMMATRIX& transformation = XMMatrixIdentity());
-    void MakeDepthPrepathForPrimitive(int arrayId, const Primitive& primitive, AlphaMode mode, const XMMATRIX& transformation);
-
-    int depthBias_ = 4;
-    float slopeScaleBias_ = 2* sqrt(2);
-    static const UINT shadowMapSize = 4096;
-    D3D11_VIEWPORT shadowMapViewport_;
-    D3D11_VIEWPORT transparentViewport_;
-    D3D11_VIEWPORT downsampleViewport_;
-    D3D11_VIEWPORT depthPrepathViewport_;
+    void RenderAmbientLight(
+        const std::shared_ptr<ID3D11ShaderResourceView>& irradianceMap,
+        const std::shared_ptr<ID3D11ShaderResourceView>& prefilteredMap,
+        const std::shared_ptr<ID3D11ShaderResourceView>& BRDF
+    );
+    void RenderDirectionalLight();
+    void RenderPointLights(const std::vector<PointLight>& lights);
 
     std::shared_ptr<Device> device_; // provided externally <-
     std::shared_ptr<ManagerStorage> managerStorage_; // provided externally <-
     std::shared_ptr<Camera> camera_; // provided externally <-
     std::shared_ptr<DirectionalLight> directionalLight_; // provided externally <-
-    std::shared_ptr<ID3D11SamplerState> samplerAvg_; // provided externally <-
+    std::shared_ptr<ID3DUserDefinedAnnotation> annotation_; // provided externally <-
+
+    std::shared_ptr<ID3D11RenderTargetView> renderTarget_; // provided externally <-
 
     ID3D11Buffer* worldMatrixBuffer_ = nullptr; // always remains only inside the class #
+    ID3D11Buffer* instancingWorldMatrixBuffer_ = nullptr; // always remains only inside the class #
     ID3D11Buffer* viewMatrixBuffer_ = nullptr; // always remains only inside the class #
-    ID3D11Buffer* materialParamsBuffer_ = nullptr; // always remains only inside the class #
-    ID3D11Buffer* shadowMapViewMatrixBuffer_ = nullptr; // always remains only inside the class #
     ID3D11Buffer* shadowMapAlphaCutoffBuffer_ = nullptr; // always remains only inside the class #
+    ID3D11Buffer* directionalLightBuffer_ = nullptr; // always remains only inside the class #
+    ID3D11Buffer* lightBuffer_ = nullptr; // always remains only inside the class #
+    ID3D11Buffer* materialParamsBuffer_ = nullptr; // always remains only inside the class #
+    ID3D11Buffer* forwardRenderViewMatrixBuffer_ = nullptr; // always remains only inside the class #
+    ID3D11Buffer* matricesBuffer_ = nullptr; // always remains only inside the class #
     ID3D11Buffer* SSAOParamsBuffer_ = nullptr; // always remains only inside the class #
 
-    ID3D11Texture2D* shadowBuffers_[CSM_SPLIT_COUNT]; // always remains only inside the class #
-    ID3D11DepthStencilView* shadowDSViews_[CSM_SPLIT_COUNT]; // always remains only inside the class #
-    ID3D11ShaderResourceView* shadowSRViews_[CSM_SPLIT_COUNT]; // always remains only inside the class #
-
     std::shared_ptr<ID3D11DepthStencilState> shadowDepthStencilState_; // provided externally <-
+    std::shared_ptr<ID3D11DepthStencilState> transparentDepthStencilState_; // provided externally <-
+    std::shared_ptr<ID3D11DepthStencilState> pointLightDepthStencilState_; // provided externally <-
+    std::shared_ptr<ID3D11DepthStencilState> generalDepthStencilState_; // provided externally <-
+
+    std::shared_ptr<ID3D11RasterizerState> pointLightRasterizerState_; // provided externally <-
+    std::shared_ptr<ID3D11RasterizerState> generalRasterizerState_; // provided externally <-
+
+    std::shared_ptr<ID3D11BlendState> generalBlendState_; // provided externally <-
+
+    std::shared_ptr<ID3D11SamplerState> samplerAvg_; // provided externally <-
     std::shared_ptr<ID3D11SamplerState> samplerPCF_; // provided externally <-
+    std::shared_ptr<ID3D11SamplerState> samplerMax_; // provided externally <-
+    std::shared_ptr<ID3D11SamplerState> generalSampler_; // provided externally <-
 
     ID3D11Texture2D* readMaxTexture_ = nullptr; // always remains only inside the class #
-    std::vector<RawPtrTexture> scaledFrames_;  // always remains only inside the class #
-    ID3D11Texture2D* transparentDepthBuffer_ = nullptr; // always remains only inside the class #
-    ID3D11DepthStencilView* transparentDSView_ = nullptr; // always remains only inside the class #
-    ID3D11ShaderResourceView* transparentSRView_ = nullptr; // always remains only inside the class #
 
-    ID3D11Texture2D* depthBuffer_ = nullptr; // always remains only inside the class #
-    ID3D11DepthStencilView* depthDSView_ = nullptr; // always remains only inside the class #
-    ID3D11ShaderResourceView* depthSRView_ = nullptr; // always remains only inside the class #
+    RawPtrDepthBuffer depth_; // always remains only inside the class #
+    RawPtrDepthBuffer depthCopy_; // always remains only inside the class #
+    RawPtrDepthBuffer transparentDepth_; // always remains only inside the class #
+
+    RawPtrTexture normals_; // always remains only inside the class #
+    RawPtrTexture features_; // always remains only inside the class #
+    RawPtrTexture color_; // always remains only inside the class #
+    RawPtrTexture emissive_; // always remains only inside the class #
+
+    std::vector<D3D11_INPUT_ELEMENT_DESC> sphereVertexDesc_ = {
+        {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0}
+    };
+    UINT sphereNumIndices_ = 0;
+    ID3D11Buffer* sphereVertexBuffer_ = nullptr; // always remains only inside the class #
+    ID3D11Buffer* sphereIndexBuffer_ = nullptr; // always remains only inside the class #
 
     std::shared_ptr<VertexShader> mappingVS_; // provided externally <-
     std::shared_ptr<PixelShader> downsamplePS_; // provided externally <-
-    std::shared_ptr<ID3D11DepthStencilState> transparentDepthStencilState_; // provided externally <-
-    std::shared_ptr<ID3D11SamplerState> samplerMax_; // provided externally <-
 
-    std::shared_ptr<ID3D11DepthStencilState> depthPrepathDepthStencilState_; // provided externally <-
+    std::shared_ptr<VertexShader> pointLightVS_; // provided externally <-
+    std::shared_ptr<PixelShader> pointLightPS_; // provided externally <-
+    std::shared_ptr<PixelShader> pointLightPSFresnel_; // provided externally <-
+    std::shared_ptr<PixelShader> pointLightPSNDF_; // provided externally <-
+    std::shared_ptr<PixelShader> pointLightPSGeometry_; // provided externally <-
+
+    std::shared_ptr<PixelShader> directionalLightPS_; // provided externally <-
+    std::shared_ptr<PixelShader> directionalLightPSShadowSplits_; // provided externally <-
+
+    std::shared_ptr<PixelShader> ambientLightPS_; // provided externally <-
+    std::shared_ptr<PixelShader> ambientLightPSSSAO_; // provided externally <-
+    std::shared_ptr<PixelShader> ambientLightPSSSAOMask_; // provided externally <-
 
     std::vector<Scene> scenes_;
     std::vector<SceneArrays> sceneArrays_;
+    std::vector<TransparentPrimitive> transparentPrimitives_;
+    std::vector<RawPtrDepthBuffer> shadowSplits_;  // always remains only inside the class #
+    std::vector<RawPtrTexture> scaledFrames_;  // always remains only inside the class #
 
-    float SSAODepthLimit_ = 0.000003f;
-    float SSAORadius_ = 2.1f;
     XMFLOAT4 SSAOSamples_[MAX_SSAO_SAMPLE_COUNT];
     XMFLOAT4 SSAONoise_[NOISE_BUFFER_SIZE];
 
-    Mode currentMode_ = DEFAULT;
-    std::vector<TransparentPrimitive> transparentPrimitives_;
-    int n = 0;
-    bool excludeTransparent_ = true;
-    bool withSSAO_ = true;
+    Mode currentMode_ = Mode::DEFAULT;
+
+    D3D11_VIEWPORT viewport_;
+    static const UINT shadowMapSize = 4096;
+    D3D11_VIEWPORT renderTargetViewport_;
     int width_ = 0;
     int height_ = 0;
+    int n_ = 0;
+
+    bool isInit_ = false;
 };

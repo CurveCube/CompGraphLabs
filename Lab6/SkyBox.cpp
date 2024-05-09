@@ -92,6 +92,7 @@ bool Skybox::Render() const {
     device_->GetDeviceContext()->PSSetShaderResources(0, 1, resources);
     device_->GetDeviceContext()->OMSetDepthStencilState(dsState_.get(), 0);
     device_->GetDeviceContext()->RSSetState(rasterizerState_.get());
+    device_->GetDeviceContext()->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
 
     device_->GetDeviceContext()->IASetIndexBuffer(indexBuffer_, DXGI_FORMAT_R32_UINT, 0);
     ID3D11Buffer* vertexBuffers[] = { vertexBuffer_ };

@@ -2,11 +2,11 @@
 
 #include "framework.h"
 
-#define MAX_LIGHT 3
+#define MAX_LIGHT 64
 #define CSM_SPLIT_COUNT 4
 
 
-struct SpotLight {
+struct PointLight {
     XMFLOAT4 pos;
     XMFLOAT4 color;
 };

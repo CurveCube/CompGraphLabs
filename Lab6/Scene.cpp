@@ -7,89 +7,266 @@
 #undef STB_IMAGE_WRITE_IMPLEMENTATION
 
 SceneManager::SceneManager() {
-    for (UINT i = 0; i < CSM_SPLIT_COUNT; ++i) {
-        shadowBuffers_[i] = nullptr;
-        shadowDSViews_[i] = nullptr;
-        shadowSRViews_[i] = nullptr;
-    }
+    viewport_.TopLeftX = 0;
+    viewport_.TopLeftY = 0;
+    viewport_.Width = shadowMapSize;
+    viewport_.Height = shadowMapSize;
+    viewport_.MinDepth = 0.0f;
+    viewport_.MaxDepth = 1.0f;
 
-    shadowMapViewport_.TopLeftX = 0;
-    shadowMapViewport_.TopLeftY = 0;
-    shadowMapViewport_.Width = shadowMapSize;
-    shadowMapViewport_.Height = shadowMapSize;
-    shadowMapViewport_.MinDepth = 0.0f;
-    shadowMapViewport_.MaxDepth = 1.0f;
-
-    transparentViewport_.TopLeftX = 0;
-    transparentViewport_.TopLeftY = 0;
-    transparentViewport_.Width = shadowMapSize;
-    transparentViewport_.Height = shadowMapSize;
-    transparentViewport_.MinDepth = 0.0f;
-    transparentViewport_.MaxDepth = 1.0f;
-
-    downsampleViewport_.TopLeftX = 0;
-    downsampleViewport_.TopLeftY = 0;
-    downsampleViewport_.Width = 1.0f;
-    downsampleViewport_.Height = 1.0f;
-    downsampleViewport_.MinDepth = 0.0f;
-    downsampleViewport_.MaxDepth = 1.0f;
-
-    depthPrepathViewport_.TopLeftX = 0;
-    depthPrepathViewport_.TopLeftY = 0;
-    depthPrepathViewport_.Width = 1.0f;
-    depthPrepathViewport_.Height = 1.0f;
-    depthPrepathViewport_.MinDepth = 0.0f;
-    depthPrepathViewport_.MaxDepth = 1.0f;
+    renderTargetViewport_.TopLeftX = 0;
+    renderTargetViewport_.TopLeftY = 0;
+    renderTargetViewport_.Width = 1.0f;
+    renderTargetViewport_.Height = 1.0f;
+    renderTargetViewport_.MinDepth = 0.0f;
+    renderTargetViewport_.MaxDepth = 1.0f;
 }
 
 HRESULT SceneManager::Init(const std::shared_ptr<Device>& device, const std::shared_ptr<ManagerStorage>& managerStorage,
-    const std::shared_ptr<Camera>& camera, const std::shared_ptr<DirectionalLight>& directionalLight, int width, int height) {
+    const std::shared_ptr<Camera>& camera, const std::shared_ptr<DirectionalLight>& directionalLight, int width, int height,
+    const std::shared_ptr<ID3DUserDefinedAnnotation>& annotation) {
     if (!managerStorage->IsInit() || !device->IsInit()) {
         return E_FAIL;
+    }
+    if (isInit_) {
+        Cleanup();
     }
 
     device_ = device;
     managerStorage_ = managerStorage;
     camera_ = camera;
     directionalLight_ = directionalLight;
+    annotation_ = annotation;
 
-    transparentViewport_.Width = width;
-    transparentViewport_.Height = height;
     width_ = width;
     height_ = height;
 
     HRESULT result = S_OK;
-    for (UINT i = 0; i < CSM_SPLIT_COUNT && SUCCEEDED(result); ++i) {
-        result = CreateDepthStencilView(shadowMapSize, shadowMapSize, &shadowBuffers_[i], &shadowDSViews_[i], &shadowSRViews_[i]);
-    }
     if (SUCCEEDED(result)) {
-        result = managerStorage_->GetStateManager()->CreateDepthStencilState(shadowDepthStencilState_, D3D11_COMPARISON_LESS);
-    }
-    if (SUCCEEDED(result)) {
-        result = managerStorage_->GetStateManager()->CreateDepthStencilState(depthPrepathDepthStencilState_, D3D11_COMPARISON_GREATER);
-    }
-    if (SUCCEEDED(result)) {
-        result = managerStorage_->GetStateManager()->CreateSamplerState(samplerPCF_, D3D11_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP,
-            D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_COMPARISON_LESS);
+        result = managerStorage_->GetVSManager()->LoadShader(mappingVS_, L"shaders/mappingVS.hlsl");
     }
     if (SUCCEEDED(result)) {
         result = managerStorage_->GetStateManager()->CreateSamplerState(samplerAvg_, D3D11_FILTER_MIN_MAG_MIP_LINEAR,
             D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP);
     }
     if (SUCCEEDED(result)) {
-        result = CreateAuxiliaryForTransparent(width, height);
+        result = managerStorage_->GetStateManager()->CreateSamplerState(generalSampler_, D3D11_FILTER_ANISOTROPIC,
+            D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP);
     }
     if (SUCCEEDED(result)) {
-        result = CreateDepthStencilView(width, height, &depthBuffer_, &depthDSView_, &depthSRView_);
+        result = managerStorage_->GetStateManager()->CreateRasterizerState(generalRasterizerState_);
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetStateManager()->CreateBlendState(generalBlendState_, D3D11_BLEND_ONE, D3D11_BLEND_ONE);
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetStateManager()->CreateDepthStencilState(generalDepthStencilState_, D3D11_COMPARISON_ALWAYS, D3D11_DEPTH_WRITE_MASK_ZERO);
+    }
+    if (SUCCEEDED(result)) {
+        result = CreateTexture(normals_, width_, height_);
+    }
+    if (SUCCEEDED(result)) {
+        result = CreateTexture(features_, width_, height_);
+    }
+    if (SUCCEEDED(result)) {
+        result = CreateTexture(color_, width_, height_);
+    }
+    if (SUCCEEDED(result)) {
+        result = CreateDepthStencilView(width_, height_, depth_);
+    }
+    if (SUCCEEDED(result)) {
+        result = CreateDepthStencilView(width_, height_, depthCopy_);
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetPSManager()->LoadShader(ambientLightPS_, L"shaders/ambientLightPS.hlsl");
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetPSManager()->LoadShader(ambientLightPSSSAO_, L"shaders/ambientLightPS.hlsl", { "WITH_SSAO" });
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetPSManager()->LoadShader(ambientLightPSSSAOMask_, L"shaders/ambientLightPS.hlsl", { "SSAO_MASK" });
+    }
+    if (SUCCEEDED(result)) {
+        result = CreateAuxiliaryForDeferredRender();
+    }
+    if (SUCCEEDED(result)) {
+        result = CreateAuxiliaryForShadowMaps();
+    }
+    if (SUCCEEDED(result)) {
+        result = CreateAuxiliaryForTransparent();
     }
     if (SUCCEEDED(result)) {
         result = CreateBuffers();
+    }
+    isInit_ = SUCCEEDED(result);
+
+    return result;
+}
+
+HRESULT SceneManager::GenerateSphere() {
+    UINT latLines = 40, longLines = 40;
+    UINT numVertices = ((latLines - 2) * longLines) + 2;
+    sphereNumIndices_ = (((latLines - 3) * (longLines) * 2) + (longLines * 2)) * 3;
+
+    float phi = 0.0f;
+    float theta = 0.0f;
+
+    std::vector<SphereVertex> vertices(numVertices);
+
+    XMVECTOR currVertPos = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+
+    vertices[0].pos.x = 0.0f;
+    vertices[0].pos.y = 0.0f;
+    vertices[0].pos.z = 1.0f;
+
+    for (UINT i = 0; i < latLines - 2; i++) {
+        theta = (i + 1) * (XM_PI / (latLines - 1));
+        XMMATRIX rotationX = XMMatrixRotationX(theta);
+        for (UINT j = 0; j < longLines; j++) {
+            phi = j * (XM_2PI / longLines);
+            XMMATRIX rotationY = XMMatrixRotationZ(phi);
+            currVertPos = XMVector3TransformNormal(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), (rotationX * rotationY));
+            currVertPos = XMVector3Normalize(currVertPos);
+            vertices[i * (__int64)longLines + j + 1].pos.x = XMVectorGetX(currVertPos);
+            vertices[i * (__int64)longLines + j + 1].pos.y = XMVectorGetY(currVertPos);
+            vertices[i * (__int64)longLines + j + 1].pos.z = XMVectorGetZ(currVertPos);
+        }
+    }
+
+    vertices[(__int64)numVertices - 1].pos.x = 0.0f;
+    vertices[(__int64)numVertices - 1].pos.y = 0.0f;
+    vertices[(__int64)numVertices - 1].pos.z = -1.0f;
+
+    std::vector<UINT> indices(sphereNumIndices_);
+
+    UINT k = 0;
+    for (UINT i = 0; i < longLines - 1; i++) {
+        indices[k] = i + 1;
+        indices[(__int64)k + 2] = 0;
+        indices[(__int64)k + 1] = i + 2;
+        k += 3;
+    }
+
+    indices[k] = longLines;
+    indices[(__int64)k + 2] = 0;
+    indices[(__int64)k + 1] = 1;
+    k += 3;
+
+    for (UINT i = 0; i < latLines - 3; i++) {
+        for (UINT j = 0; j < longLines - 1; j++) {
+            indices[(__int64)k + 2] = i * longLines + j + 1;
+            indices[(__int64)k + 1] = i * longLines + j + 2;
+            indices[k] = (i + 1) * longLines + j + 1;
+
+            indices[(__int64)k + 5] = (i + 1) * longLines + j + 1;
+            indices[(__int64)k + 4] = i * longLines + j + 2;
+            indices[(__int64)k + 3] = (i + 1) * longLines + j + 2;
+
+            k += 6;
+        }
+
+        indices[(__int64)k + 2] = (i * longLines) + longLines;
+        indices[(__int64)k + 1] = (i * longLines) + 1;
+        indices[k] = ((i + 1) * longLines) + longLines;
+
+        indices[(__int64)k + 5] = ((i + 1) * longLines) + longLines;
+        indices[(__int64)k + 4] = (i * longLines) + 1;
+        indices[(__int64)k + 3] = ((i + 1) * longLines) + 1;
+
+        k += 6;
+    }
+
+    for (UINT i = 0; i < longLines - 1; i++) {
+        indices[(__int64)k + 2] = numVertices - 1;
+        indices[k] = (numVertices - 1) - (i + 1);
+        indices[(__int64)k + 1] = (numVertices - 1) - (i + 2);
+        k += 3;
+    }
+
+    indices[(__int64)k + 2] = numVertices - 1;
+    indices[k] = (numVertices - 1) - longLines;
+    indices[(__int64)k + 1] = numVertices - 2;
+
+    UINT verticesBytes = sizeof(SphereVertex) * numVertices;
+    UINT indicesBytes = sizeof(UINT) * sphereNumIndices_;
+
+    D3D11_BUFFER_DESC desc = {};
+    desc.ByteWidth = verticesBytes;
+    desc.Usage = D3D11_USAGE_IMMUTABLE;
+    desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    desc.CPUAccessFlags = 0;
+    desc.MiscFlags = 0;
+    desc.StructureByteStride = 0;
+
+    D3D11_SUBRESOURCE_DATA data;
+    data.pSysMem = vertices.data();
+    data.SysMemPitch = verticesBytes;
+    data.SysMemSlicePitch = 0;
+
+    HRESULT result = S_OK;
+    result = device_->GetDevice()->CreateBuffer(&desc, &data, &sphereVertexBuffer_);
+
+    if (SUCCEEDED(result)) {
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = indicesBytes;
+        desc.Usage = D3D11_USAGE_IMMUTABLE;
+        desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+
+        D3D11_SUBRESOURCE_DATA data;
+        data.pSysMem = indices.data();
+        data.SysMemPitch = indicesBytes;
+        data.SysMemSlicePitch = 0;
+
+        result = device_->GetDevice()->CreateBuffer(&desc, &data, &sphereIndexBuffer_);
     }
 
     return result;
 }
 
-HRESULT SceneManager::CreateDepthStencilView(int width, int height, ID3D11Texture2D** buffer, ID3D11DepthStencilView** DSV, ID3D11ShaderResourceView** SRV) {
+HRESULT SceneManager::CreateAuxiliaryForDeferredRender() {
+    HRESULT result = S_OK;
+    if (SUCCEEDED(result)) {
+        result = GenerateSphere();
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetStateManager()->CreateRasterizerState(pointLightRasterizerState_, D3D11_FILL_SOLID, D3D11_CULL_BACK); // the inner side of the sphere is preserved,
+                                                                                                                                           // just the indices were taken for left coordinate system
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetStateManager()->CreateDepthStencilState(pointLightDepthStencilState_, D3D11_COMPARISON_LESS_EQUAL, D3D11_DEPTH_WRITE_MASK_ZERO);
+    }
+    if (SUCCEEDED(result)) {
+        result = CreateTexture(emissive_, width_, height_);
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetVSManager()->LoadShader(pointLightVS_, L"shaders/VS.hlsl", { "HAS_UV_OUT", "INSTANCING"}, sphereVertexDesc_);
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetPSManager()->LoadShader(pointLightPS_, L"shaders/pointLightPS.hlsl", { "DEFAULT" });
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetPSManager()->LoadShader(pointLightPSFresnel_, L"shaders/pointLightPS.hlsl", { "FRESNEL" });
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetPSManager()->LoadShader(pointLightPSNDF_, L"shaders/pointLightPS.hlsl", { "ND" });
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetPSManager()->LoadShader(pointLightPSGeometry_, L"shaders/pointLightPS.hlsl", { "GEOMETRY" });
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetPSManager()->LoadShader(directionalLightPS_, L"shaders/directionalEmissiveLightPS.hlsl");
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetPSManager()->LoadShader(directionalLightPSShadowSplits_, L"shaders/directionalEmissiveLightPS.hlsl", { "SHADOW_SPLITS" });
+    }
+
+    return result;
+}
+
+HRESULT SceneManager::CreateDepthStencilView(int width, int height, RawPtrDepthBuffer& buffer) {
     D3D11_TEXTURE2D_DESC desc = {};
     desc.Format = DXGI_FORMAT_R32_TYPELESS;
     desc.ArraySize = 1;
@@ -102,14 +279,14 @@ HRESULT SceneManager::CreateDepthStencilView(int width, int height, ID3D11Textur
     desc.MiscFlags = 0;
     desc.SampleDesc.Count = 1;
     desc.SampleDesc.Quality = 0;
-    HRESULT result = device_->GetDevice()->CreateTexture2D(&desc, nullptr, buffer);
+    HRESULT result = device_->GetDevice()->CreateTexture2D(&desc, nullptr, &buffer.texture);
     if (SUCCEEDED(result)) {
         D3D11_DEPTH_STENCIL_VIEW_DESC desc = {};
         desc.Format = DXGI_FORMAT_D32_FLOAT;
         desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
         desc.Texture2D.MipSlice = 0;
         desc.Flags = 0;
-        result = device_->GetDevice()->CreateDepthStencilView(*buffer, &desc, DSV);
+        result = device_->GetDevice()->CreateDepthStencilView(buffer.texture, &desc, &buffer.DSV);
     }
     if (SUCCEEDED(result)) {
         D3D11_SHADER_RESOURCE_VIEW_DESC desc = {};
@@ -117,22 +294,38 @@ HRESULT SceneManager::CreateDepthStencilView(int width, int height, ID3D11Textur
         desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
         desc.Texture2D.MipLevels = 1;
         desc.Texture2D.MostDetailedMip = 0;
-        result = device_->GetDevice()->CreateShaderResourceView(*buffer, &desc, SRV);
+        result = device_->GetDevice()->CreateShaderResourceView(buffer.texture, &desc, &buffer.SRV);
     }
     return result;
 }
 
-HRESULT SceneManager::CreateAuxiliaryForTransparent(int width, int height) {
-    n = 0;
-    int minSide = min(width, height);
+HRESULT SceneManager::CreateAuxiliaryForShadowMaps() {
+    HRESULT result = S_OK;
+    for (UINT i = 0; i < CSM_SPLIT_COUNT && SUCCEEDED(result); ++i) {
+        RawPtrDepthBuffer depthBuffer;
+        result = CreateDepthStencilView(shadowMapSize, shadowMapSize, depthBuffer);
+        if (SUCCEEDED(result)) {
+            shadowSplits_.push_back(depthBuffer);
+        }
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetStateManager()->CreateDepthStencilState(shadowDepthStencilState_, D3D11_COMPARISON_LESS);
+    }
+    if (SUCCEEDED(result)) {
+        result = managerStorage_->GetStateManager()->CreateSamplerState(samplerPCF_, D3D11_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP,
+            D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_COMPARISON_LESS);
+    }
+    return result;
+}
+
+HRESULT SceneManager::CreateAuxiliaryForTransparent() {
+    n_ = 0;
+    int minSide = min(width_, height_);
     while (minSide >>= 1) {
-        n++;
+        n_++;
     }
 
-    HRESULT result = managerStorage_->GetVSManager()->LoadShader(mappingVS_, L"shaders/mappingVS.hlsl");
-    if (SUCCEEDED(result)) {
-        result = managerStorage_->GetPSManager()->LoadShader(downsamplePS_, L"shaders/downsampleOnlyMaxPS.hlsl");
-    }
+    HRESULT result = managerStorage_->GetPSManager()->LoadShader(downsamplePS_, L"shaders/downsampleWithMaxPS.hlsl");
     if (SUCCEEDED(result)) {
         result = managerStorage_->GetStateManager()->CreateDepthStencilState(transparentDepthStencilState_);
     }
@@ -154,9 +347,9 @@ HRESULT SceneManager::CreateAuxiliaryForTransparent(int width, int height) {
         result = device_->GetDevice()->CreateTexture2D(&textureDesc, nullptr, &readMaxTexture_);
     }
     if (SUCCEEDED(result)) {
-        result = CreateDepthStencilView(width, height, &transparentDepthBuffer_, &transparentDSView_, &transparentSRView_);
+        result = CreateDepthStencilView(width_, height_, transparentDepth_);
     }
-    for (int i = 0; i < n + 1 && SUCCEEDED(result); ++i) {
+    for (int i = 0; i < n_ + 1 && SUCCEEDED(result); ++i) {
         RawPtrTexture texture;
         result = CreateTexture(texture, i);
         if (SUCCEEDED(result)) {
@@ -167,13 +360,13 @@ HRESULT SceneManager::CreateAuxiliaryForTransparent(int width, int height) {
     return result;
 }
 
-HRESULT SceneManager::CreateTexture(RawPtrTexture& texture, int i) {
+HRESULT SceneManager::CreateTexture(RawPtrTexture& texture, int width, int height, DXGI_FORMAT format) {
     D3D11_TEXTURE2D_DESC textureDesc = {};
-    textureDesc.Width = pow(2, i);
-    textureDesc.Height = pow(2, i);
+    textureDesc.Width = width;
+    textureDesc.Height = height;
     textureDesc.MipLevels = 1;
     textureDesc.ArraySize = 1;
-    textureDesc.Format = DXGI_FORMAT_R32_FLOAT;
+    textureDesc.Format = format;
     textureDesc.SampleDesc.Count = 1;
     textureDesc.Usage = D3D11_USAGE_DEFAULT;
     textureDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
@@ -182,7 +375,7 @@ HRESULT SceneManager::CreateTexture(RawPtrTexture& texture, int i) {
     HRESULT result = device_->GetDevice()->CreateTexture2D(&textureDesc, nullptr, &texture.texture);
     if (SUCCEEDED(result)) {
         D3D11_RENDER_TARGET_VIEW_DESC renderTargetViewDesc;
-        renderTargetViewDesc.Format = DXGI_FORMAT_R32_FLOAT;
+        renderTargetViewDesc.Format = format;
         renderTargetViewDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
         renderTargetViewDesc.Texture2D.MipSlice = 0;
 
@@ -190,7 +383,7 @@ HRESULT SceneManager::CreateTexture(RawPtrTexture& texture, int i) {
     }
     if (SUCCEEDED(result)) {
         D3D11_SHADER_RESOURCE_VIEW_DESC shaderResourceViewDesc;
-        shaderResourceViewDesc.Format = DXGI_FORMAT_R32_FLOAT;
+        shaderResourceViewDesc.Format = format;
         shaderResourceViewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
         shaderResourceViewDesc.Texture2D.MostDetailedMip = 0;
         shaderResourceViewDesc.Texture2D.MipLevels = 1;
@@ -199,6 +392,10 @@ HRESULT SceneManager::CreateTexture(RawPtrTexture& texture, int i) {
     }
 
     return result;
+}
+
+HRESULT SceneManager::CreateTexture(RawPtrTexture& texture, int i) {
+    return CreateTexture(texture, pow(2, i), pow(2, i), DXGI_FORMAT_R32_FLOAT);
 }
 
 HRESULT SceneManager::CreateBuffers() {
@@ -212,6 +409,16 @@ HRESULT SceneManager::CreateBuffers() {
     HRESULT result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &worldMatrixBuffer_);
     if (SUCCEEDED(result)) {
         D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = sizeof(InstancingWorldMatrixBuffer);
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+        result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &instancingWorldMatrixBuffer_);
+    }
+    if (SUCCEEDED(result)) {
+        D3D11_BUFFER_DESC desc = {};
         desc.ByteWidth = sizeof(ViewMatrixBuffer);
         desc.Usage = D3D11_USAGE_DEFAULT;
         desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
@@ -219,6 +426,36 @@ HRESULT SceneManager::CreateBuffers() {
         desc.MiscFlags = 0;
         desc.StructureByteStride = 0;
         result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &viewMatrixBuffer_);
+    }
+    if (SUCCEEDED(result)) {
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = sizeof(ShadowMapAlphaCutoffBuffer);
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+        result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &shadowMapAlphaCutoffBuffer_);
+    }
+    if (SUCCEEDED(result)) {
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = sizeof(LightBuffer);
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+        result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &lightBuffer_);
+    }
+    if (SUCCEEDED(result)) {
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth = sizeof(DirectionalLightBuffer);
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+        result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &directionalLightBuffer_);
     }
     if (SUCCEEDED(result)) {
         D3D11_BUFFER_DESC desc = {};
@@ -232,23 +469,23 @@ HRESULT SceneManager::CreateBuffers() {
     }
     if (SUCCEEDED(result)) {
         D3D11_BUFFER_DESC desc = {};
-        desc.ByteWidth = sizeof(ShadowMapViewMatrixBuffer);
+        desc.ByteWidth = sizeof(ForwardRenderViewMatrixBuffer);
         desc.Usage = D3D11_USAGE_DEFAULT;
         desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         desc.CPUAccessFlags = 0;
         desc.MiscFlags = 0;
         desc.StructureByteStride = 0;
-        result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &shadowMapViewMatrixBuffer_);
+        result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &forwardRenderViewMatrixBuffer_);
     }
     if (SUCCEEDED(result)) {
         D3D11_BUFFER_DESC desc = {};
-        desc.ByteWidth = sizeof(ShadowMapAlphaCutoffBuffer);
+        desc.ByteWidth = sizeof(MatricesBuffer);
         desc.Usage = D3D11_USAGE_DEFAULT;
         desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         desc.CPUAccessFlags = 0;
         desc.MiscFlags = 0;
         desc.StructureByteStride = 0;
-        result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &shadowMapAlphaCutoffBuffer_);
+        result = device_->GetDevice()->CreateBuffer(&desc, nullptr, &matricesBuffer_);
     }
     if (SUCCEEDED(result)) {
         D3D11_BUFFER_DESC desc = {};
@@ -831,6 +1068,8 @@ HRESULT SceneManager::CreateMeshes(const tinygltf::Model& model, SceneArrays& ar
 void SceneManager::ParseAttributes(const SceneArrays& arrays, const tinygltf::Primitive& primitive,
     std::vector<Attribute>& attributes, std::vector<std::string>& baseDefines, std::vector<D3D11_INPUT_ELEMENT_DESC>& desc) {
     std::vector<Attribute> tmp;
+    baseDefines.clear();
+    baseDefines.push_back("HAS_NORMAL");
     for (int i = 0; i < 9; ++i) {
         tmp.push_back(Attribute());
     }
@@ -961,30 +1200,57 @@ HRESULT SceneManager::CreateShaders(Primitive& primitive, const SceneArrays& arr
     std::vector<std::string> SSAOMaskMacros = defaulMacros;
     SSAOMaskMacros.push_back("SSAO_MASK");
 
-    HRESULT result = managerStorage_->GetVSManager()->LoadShader(primitive.VS, L"shaders/VS.hlsl", baseDefines, desc);
+    std::vector<std::string> OpaqueSSAOMaskMacros = SSAOMaskMacros;
+
+    if (arrays.materials[primitive.materialId].mode == AlphaMode::BLEND_MODE) {
+        defaulMacros.push_back("TRANSPARENT");
+        fresnelMacros.push_back("TRANSPARENT");
+        ndfMacros.push_back("TRANSPARENT");
+        geometryMacros.push_back("TRANSPARENT");
+        shadowSplitsMacros.push_back("TRANSPARENT");
+        SSAOMacros.push_back("TRANSPARENT");
+        SSAOMaskMacros.push_back("TRANSPARENT");
+    }
+
+    std::vector<std::string> shadowVSMacros = baseDefines;
+    shadowVSMacros.push_back("HAS_COLOR_OUT");
+    shadowVSMacros.push_back("HAS_TEXCOORD_OUT");
+
+    std::vector<std::string> VSMacros = shadowVSMacros;
+    VSMacros.push_back("HAS_WORLD_POS_OUT");
+    VSMacros.push_back("HAS_NORMAL_OUT");
+    VSMacros.push_back("HAS_TANGENT_OUT");
+
+    HRESULT result = managerStorage_->GetVSManager()->LoadShader(primitive.VS, L"shaders/VS.hlsl", VSMacros, desc);
     if (SUCCEEDED(result)) {
-        result = managerStorage_->GetVSManager()->LoadShader(primitive.shadowVS, L"shaders/shadowVS.hlsl", baseDefines, desc);
+        result = managerStorage_->GetVSManager()->LoadShader(primitive.shadowVS, L"shaders/VS.hlsl", shadowVSMacros, desc);
+    }
+    if (SUCCEEDED(result) && arrays.materials[primitive.materialId].mode != AlphaMode::BLEND_MODE) {
+        result = managerStorage_->GetPSManager()->LoadShader(primitive.gBufferPS, L"shaders/gBufferPS.hlsl", baseDefines);
     }
     if (SUCCEEDED(result)) {
-        result = managerStorage_->GetPSManager()->LoadShader(primitive.PSDefault, L"shaders/PS.hlsl", defaulMacros);
+        result = managerStorage_->GetPSManager()->LoadShader(primitive.PSDefault, L"shaders/forwardRenderPS.hlsl", defaulMacros);
     }
     if (SUCCEEDED(result)) {
-        result = managerStorage_->GetPSManager()->LoadShader(primitive.PSFresnel, L"shaders/PS.hlsl", fresnelMacros);
+        result = managerStorage_->GetPSManager()->LoadShader(primitive.PSFresnel, L"shaders/forwardRenderPS.hlsl", fresnelMacros);
     }
     if (SUCCEEDED(result)) {
-        result = managerStorage_->GetPSManager()->LoadShader(primitive.PSNdf, L"shaders/PS.hlsl", ndfMacros);
+        result = managerStorage_->GetPSManager()->LoadShader(primitive.PSNdf, L"shaders/forwardRenderPS.hlsl", ndfMacros);
     }
     if (SUCCEEDED(result)) {
-        result = managerStorage_->GetPSManager()->LoadShader(primitive.PSGeometry, L"shaders/PS.hlsl", geometryMacros);
+        result = managerStorage_->GetPSManager()->LoadShader(primitive.PSGeometry, L"shaders/forwardRenderPS.hlsl", geometryMacros);
     }
     if (SUCCEEDED(result)) {
-        result = managerStorage_->GetPSManager()->LoadShader(primitive.PSShadowSplits, L"shaders/PS.hlsl", shadowSplitsMacros);
+        result = managerStorage_->GetPSManager()->LoadShader(primitive.PSShadowSplits, L"shaders/forwardRenderPS.hlsl", shadowSplitsMacros);
     }
     if (SUCCEEDED(result)) {
-        result = managerStorage_->GetPSManager()->LoadShader(primitive.PSSSAO, L"shaders/PS.hlsl", SSAOMacros);
+        result = managerStorage_->GetPSManager()->LoadShader(primitive.PSSSAOMask, L"shaders/forwardRenderPS.hlsl", OpaqueSSAOMaskMacros);
     }
-    if (SUCCEEDED(result)) {
-        result = managerStorage_->GetPSManager()->LoadShader(primitive.PSSSAOMask, L"shaders/PS.hlsl", SSAOMaskMacros);
+    if (SUCCEEDED(result) && arrays.materials[primitive.materialId].mode == AlphaMode::BLEND_MODE) {
+        result = managerStorage_->GetPSManager()->LoadShader(primitive.transparentPSSSAO, L"shaders/forwardRenderPS.hlsl", SSAOMacros);
+        if (SUCCEEDED(result)) {
+            result = managerStorage_->GetPSManager()->LoadShader(primitive.transparentPSSSAOMask, L"shaders/forwardRenderPS.hlsl", SSAOMaskMacros);
+        }
     }
     if (SUCCEEDED(result) && arrays.materials[primitive.materialId].mode != AlphaMode::OPAQUE_MODE) { // opaque without pixel shader for shadow map
         result = managerStorage_->GetPSManager()->LoadShader(primitive.shadowPS, L"shaders/shadowPS.hlsl", baseDefines);
@@ -1030,20 +1296,21 @@ HRESULT SceneManager::CreateNodes(const tinygltf::Model& model, SceneArrays& arr
 }
 
 bool SceneManager::CreateShadowMaps(const std::vector<int>& sceneIndices) {
-    if (!IsInit()) {
-        return false;
+    if (!!annotation_) {
+        annotation_->BeginEvent(L"Create_shadow_maps");
     }
-
     for (UINT i = 0; i < CSM_SPLIT_COUNT; ++i) {
-        device_->GetDeviceContext()->ClearDepthStencilView(shadowDSViews_[i], D3D11_CLEAR_DEPTH, 1.0f, 0);
-        device_->GetDeviceContext()->OMSetRenderTargets(0, nullptr, shadowDSViews_[i]);
+        device_->GetDeviceContext()->ClearDepthStencilView(shadowSplits_[i].DSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
+        device_->GetDeviceContext()->OMSetRenderTargets(0, nullptr, shadowSplits_[i].DSV);
         device_->GetDeviceContext()->OMSetDepthStencilState(shadowDepthStencilState_.get(), 0);
-        device_->GetDeviceContext()->RSSetViewports(1, &shadowMapViewport_);
+        viewport_.Width = shadowMapSize;
+        viewport_.Height = shadowMapSize;
+        device_->GetDeviceContext()->RSSetViewports(1, &viewport_);
         device_->GetDeviceContext()->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
 
-        ShadowMapViewMatrixBuffer viewMatrix;
+        ViewMatrixBuffer viewMatrix;
         viewMatrix.viewProjectionMatrix = directionalLight_->viewProjectionMatrices[i];
-        device_->GetDeviceContext()->UpdateSubresource(shadowMapViewMatrixBuffer_, 0, nullptr, &viewMatrix, 0, 0);
+        device_->GetDeviceContext()->UpdateSubresource(viewMatrixBuffer_, 0, nullptr, &viewMatrix, 0, 0);
 
         for (auto j : sceneIndices) {
             if (j < 0 || j >= scenes_.size()) {
@@ -1051,10 +1318,16 @@ bool SceneManager::CreateShadowMaps(const std::vector<int>& sceneIndices) {
             }
             for (auto node : scenes_[j].rootNodes) {
                 if (!CreateShadowMapForNode(scenes_[j].arraysId, node, scenes_[j].transformation)) {
+                    if (!!annotation_) {
+                        annotation_->EndEvent();
+                    }
                     return false;
                 }
             }
         }
+    }
+    if (!!annotation_) {
+        annotation_->EndEvent();
     }
     return true;
 }
@@ -1070,7 +1343,7 @@ bool SceneManager::CreateShadowMapForNode(int arrayId, int nodeId, const XMMATRI
                 return false;
             }
         }
-        if (!excludeTransparent_) {
+        if (!excludeTransparent) {
             for (auto& p : mesh.transparentPrimitives) {
                 if (!CreateShadowMapForPrimitive(arrayId, p, AlphaMode::ALPHA_CUTOFF_MODE, currentTransformation)) {
                     return false;
@@ -1101,7 +1374,7 @@ bool SceneManager::CreateShadowMapForPrimitive(int arrayId, const Primitive& pri
     device_->GetDeviceContext()->UpdateSubresource(worldMatrixBuffer_, 0, nullptr, &worldMatrix, 0, 0);
 
     std::shared_ptr<ID3D11RasterizerState> rasterizerState;
-    HRESULT result = managerStorage_->GetStateManager()->CreateRasterizerState(rasterizerState, D3D11_FILL_SOLID, material.cullMode, depthBias_, slopeScaleBias_);
+    HRESULT result = managerStorage_->GetStateManager()->CreateRasterizerState(rasterizerState, D3D11_FILL_SOLID, material.cullMode, depthBias, slopeScaleBias);
     if (FAILED(result)) {
         return false;
     }
@@ -1137,7 +1410,7 @@ bool SceneManager::CreateShadowMapForPrimitive(int arrayId, const Primitive& pri
     device_->GetDeviceContext()->IASetPrimitiveTopology(primitive.mode);
     device_->GetDeviceContext()->VSSetShader(primitive.shadowVS->GetShader().get(), nullptr, 0);
     device_->GetDeviceContext()->VSSetConstantBuffers(0, 1, &worldMatrixBuffer_);
-    device_->GetDeviceContext()->VSSetConstantBuffers(1, 1, &shadowMapViewMatrixBuffer_);
+    device_->GetDeviceContext()->VSSetConstantBuffers(1, 1, &viewMatrixBuffer_);
 
     if (mode == AlphaMode::ALPHA_CUTOFF_MODE) {
         device_->GetDeviceContext()->PSSetShader(primitive.shadowPS->GetShader().get(), nullptr, 0);
@@ -1159,18 +1432,19 @@ bool SceneManager::CreateShadowMapForPrimitive(int arrayId, const Primitive& pri
 }
 
 bool SceneManager::PrepareTransparent(const std::vector<int>& sceneIndices) {
-    if (!IsInit()) {
-        return false;
-    }
-    if (excludeTransparent_) {
+    if (excludeTransparent) {
         return true;
+    }
+    
+    if (!!annotation_) {
+        annotation_->BeginEvent(L"Prepare_transparent");
     }
 
     transparentPrimitives_.clear();
 
-    ShadowMapViewMatrixBuffer viewMatrix;
+    ViewMatrixBuffer viewMatrix;
     viewMatrix.viewProjectionMatrix = camera_->GetViewProjectionMatrix();
-    device_->GetDeviceContext()->UpdateSubresource(shadowMapViewMatrixBuffer_, 0, nullptr, &viewMatrix, 0, 0);
+    device_->GetDeviceContext()->UpdateSubresource(viewMatrixBuffer_, 0, nullptr, &viewMatrix, 0, 0);
 
     for (auto j : sceneIndices) {
         if (j < 0 || j >= scenes_.size()) {
@@ -1178,11 +1452,16 @@ bool SceneManager::PrepareTransparent(const std::vector<int>& sceneIndices) {
         }
         for (auto node : scenes_[j].rootNodes) {
             if (!PrepareTransparentForNode(scenes_[j].arraysId, node, scenes_[j].transformation)) {
+                if (!!annotation_) {
+                    annotation_->EndEvent();
+                }
                 return false;
             }
         }
     }
-
+    if (!!annotation_) {
+        annotation_->EndEvent();
+    }
     return true;
 }
 
@@ -1212,10 +1491,12 @@ bool SceneManager::AddPrimitiveToTransparentPrimitives(int arrayId, const Primit
     transparentPrimitive.transformation = transformation;
     transparentPrimitive.arrayId = arrayId;
 
-    device_->GetDeviceContext()->ClearDepthStencilView(transparentDSView_, D3D11_CLEAR_DEPTH, 0.0f, 0);
-    device_->GetDeviceContext()->OMSetRenderTargets(0, nullptr, transparentDSView_);
+    device_->GetDeviceContext()->ClearDepthStencilView(transparentDepth_.DSV, D3D11_CLEAR_DEPTH, 0.0f, 0);
+    device_->GetDeviceContext()->OMSetRenderTargets(0, nullptr, transparentDepth_.DSV);
     device_->GetDeviceContext()->OMSetDepthStencilState(transparentDepthStencilState_.get(), 0);
-    device_->GetDeviceContext()->RSSetViewports(1, &transparentViewport_);
+    viewport_.Width = width_;
+    viewport_.Height = height_;
+    device_->GetDeviceContext()->RSSetViewports(1, &viewport_);
     device_->GetDeviceContext()->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
 
     WorldMatrixBuffer worldMatrix;
@@ -1238,7 +1519,7 @@ bool SceneManager::AddPrimitiveToTransparentPrimitives(int arrayId, const Primit
     device_->GetDeviceContext()->IASetPrimitiveTopology(primitive.mode);
     device_->GetDeviceContext()->VSSetShader(primitive.shadowVS->GetShader().get(), nullptr, 0);
     device_->GetDeviceContext()->VSSetConstantBuffers(0, 1, &worldMatrixBuffer_);
-    device_->GetDeviceContext()->VSSetConstantBuffers(1, 1, &shadowMapViewMatrixBuffer_);
+    device_->GetDeviceContext()->VSSetConstantBuffers(1, 1, &viewMatrixBuffer_);
     device_->GetDeviceContext()->PSSetShader(nullptr, nullptr, 0);
     if (primitive.indicesAccessorId >= 0) {
         const BufferAccessor& accessor = sceneArrays_[arrayId].accessors[primitive.indicesAccessorId];
@@ -1249,8 +1530,8 @@ bool SceneManager::AddPrimitiveToTransparentPrimitives(int arrayId, const Primit
         device_->GetDeviceContext()->Draw(sceneArrays_[arrayId].accessors[primitive.attributes[0].verticesAccessorId].count, 0);
     }
 
-    static float color[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
-    for (int i = n; i >= 0; --i) {
+    static float color[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+    for (int i = n_; i >= 0; --i) {
         ID3D11RenderTargetView* views[] = { scaledFrames_[i].RTV };
         device_->GetDeviceContext()->OMSetRenderTargets(1, views, nullptr);
         device_->GetDeviceContext()->ClearRenderTargetView(scaledFrames_[i].RTV, color);
@@ -1258,11 +1539,11 @@ bool SceneManager::AddPrimitiveToTransparentPrimitives(int arrayId, const Primit
         ID3D11SamplerState* samplers[] = { samplerMax_.get() };
         device_->GetDeviceContext()->PSSetSamplers(0, 1, samplers);
 
-        downsampleViewport_.Width = pow(2, i);
-        downsampleViewport_.Height = pow(2, i);
-        device_->GetDeviceContext()->RSSetViewports(1, &downsampleViewport_);
+        viewport_.Width = pow(2, i);
+        viewport_.Height = pow(2, i);
+        device_->GetDeviceContext()->RSSetViewports(1, &viewport_);
 
-        ID3D11ShaderResourceView* resources[] = { i == n ? transparentSRView_ : scaledFrames_[i + 1].SRV };
+        ID3D11ShaderResourceView* resources[] = { i == n_ ? transparentDepth_.SRV : scaledFrames_[i + 1].SRV };
         device_->GetDeviceContext()->PSSetShaderResources(0, 1, resources);
         device_->GetDeviceContext()->RSSetState(nullptr);
         device_->GetDeviceContext()->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
@@ -1296,31 +1577,87 @@ bool SceneManager::Render(
     const std::shared_ptr<ID3D11ShaderResourceView>& prefilteredMap,
     const std::shared_ptr<ID3D11ShaderResourceView>& BRDF,
     const std::shared_ptr<Skybox>& skybox,
-    const std::vector<SpotLight>& lights,
+    const std::vector<PointLight>& lights,
     const std::vector<int>& sceneIndices
 ) {
-    if (!IsInit()) {
+    if (!IsInit() || !renderTarget_) {
         return false;
     }
 
-    XMFLOAT3 cameraPos = camera_->GetPosition();
-    ViewMatrixBuffer sceneBuffer;
-    sceneBuffer.viewProjectionMatrix = camera_->GetViewProjectionMatrix();
-    sceneBuffer.cameraPos = XMFLOAT4(cameraPos.x, cameraPos.y, cameraPos.z, 1.0f);
-    sceneBuffer.lightParams = XMINT4(int(lights.size()), 0, 0, 0);
-    sceneBuffer.directionalLight = directionalLight_->GetInfo();
-    for (int i = 0; i < lights.size() && i < MAX_LIGHT; ++i) {
-        sceneBuffer.lights[i].pos = lights[i].pos;
-        sceneBuffer.lights[i].color = lights[i].color;
+    if (!!annotation_) {
+        annotation_->BeginEvent(L"Preliminary_preparations");
     }
-    device_->GetDeviceContext()->UpdateSubresource(viewMatrixBuffer_, 0, nullptr, &sceneBuffer, 0, 0);
 
-    if (withSSAO_) {
+    if (currentMode_ == Mode::DEFAULT || currentMode_ == Mode::SHADOW_SPLITS) {
+        if (!CreateShadowMaps(sceneIndices)) {
+            if (!!annotation_) {
+                annotation_->EndEvent();
+            }
+            return false;
+        }
+    }
+
+    if (!PrepareTransparent(sceneIndices)) {
+        if (!!annotation_) {
+            annotation_->EndEvent();
+        }
+        return false;
+    }
+
+    static const FLOAT backColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    device_->GetDeviceContext()->ClearRenderTargetView(normals_.RTV, backColor);
+    device_->GetDeviceContext()->ClearRenderTargetView(features_.RTV, backColor);
+    device_->GetDeviceContext()->ClearRenderTargetView(color_.RTV, backColor);
+    if (deferredRender) {
+        device_->GetDeviceContext()->ClearRenderTargetView(emissive_.RTV, backColor);
+    }
+    device_->GetDeviceContext()->ClearDepthStencilView(depth_.DSV, D3D11_CLEAR_DEPTH, 0.0f, 0);
+
+    device_->GetDeviceContext()->RSSetViewports(1, &renderTargetViewport_);
+
+    if (deferredRender) {
+        ID3D11RenderTargetView* rtv[] = { color_.RTV, features_.RTV, normals_.RTV, emissive_.RTV };
+        device_->GetDeviceContext()->OMSetRenderTargets(4, rtv, depth_.DSV);
+    }
+    else {
+        ID3D11RenderTargetView* rtv[] = { renderTarget_.get(), color_.RTV, features_.RTV, normals_.RTV };
+        device_->GetDeviceContext()->OMSetRenderTargets(4, rtv, depth_.DSV);
+    }
+
+    if (!!annotation_) {
+        annotation_->EndEvent();
+        annotation_->BeginEvent(L"Draw_scene");
+    }
+
+    ViewMatrixBuffer viewBuffer;
+    viewBuffer.viewProjectionMatrix = camera_->GetViewProjectionMatrix();
+    device_->GetDeviceContext()->UpdateSubresource(viewMatrixBuffer_, 0, nullptr, &viewBuffer, 0, 0);
+
+    XMFLOAT3 cameraPos = camera_->GetPosition();
+    MatricesBuffer matricesBuffer;
+    matricesBuffer.cameraPos = XMFLOAT4(cameraPos.x, cameraPos.y, cameraPos.z, 1.0f);
+    matricesBuffer.projectionMatrix = camera_->GetProjectionMatrix();
+    matricesBuffer.viewMatrix = camera_->GetViewMatrix();
+    matricesBuffer.invProjectionMatrix = XMMatrixInverse(nullptr, matricesBuffer.projectionMatrix);
+    matricesBuffer.invViewMatrix = XMMatrixInverse(nullptr, matricesBuffer.viewMatrix);
+    device_->GetDeviceContext()->UpdateSubresource(matricesBuffer_, 0, nullptr, &matricesBuffer, 0, 0);
+
+    if ((!excludeTransparent && !transparentPrimitives_.empty()) || !deferredRender) {
+        ForwardRenderViewMatrixBuffer sceneBuffer;
+        sceneBuffer.viewProjectionMatrix = camera_->GetViewProjectionMatrix();
+        sceneBuffer.lightParams = XMINT4(int(lights.size()), 0, 0, 0);
+        sceneBuffer.directionalLight = directionalLight_->GetInfo();
+        for (int i = 0; i < lights.size() && i < MAX_LIGHT; ++i) {
+            sceneBuffer.lights[i].pos = lights[i].pos;
+            sceneBuffer.lights[i].color = lights[i].color;
+        }
+        device_->GetDeviceContext()->UpdateSubresource(forwardRenderViewMatrixBuffer_, 0, nullptr, &sceneBuffer, 0, 0);
+    }
+
+    if ((withSSAO && currentMode_ == Mode::DEFAULT) || currentMode_ == Mode::SSAO_MASK) {
         SSAOParamsBuffer buffer;
-        buffer.parameters = XMFLOAT4(MAX_SSAO_SAMPLE_COUNT, SSAORadius_, SSAODepthLimit_, 0.0f);
+        buffer.parameters = XMFLOAT4(MAX_SSAO_SAMPLE_COUNT, SSAORadius, SSAODepthLimit, 0.0f);
         buffer.sizes = XMFLOAT4(width_, height_, 0.0f, 0.0f);
-        buffer.projectionMatrix = camera_->GetProjectionMatrix();
-        buffer.viewMatrix = camera_->GetViewMatrix();
         for (int i = 0; i < MAX_SSAO_SAMPLE_COUNT; ++i) {
             buffer.samples[i] = SSAOSamples_[i];
         }
@@ -1339,12 +1676,36 @@ bool SceneManager::Render(
         }
     }
 
+    device_->GetDeviceContext()->CopyResource(depthCopy_.texture, depth_.texture);
+    ID3D11RenderTargetView* rtv[] = { renderTarget_.get() };
+    device_->GetDeviceContext()->OMSetRenderTargets(1, rtv, depth_.DSV);
+
+    if (currentMode_ == Mode::DEFAULT || currentMode_ == Mode::SSAO_MASK) {
+        RenderAmbientLight(irradianceMap, prefilteredMap, BRDF);
+    }
+
+    if (deferredRender) {
+        if (currentMode_ == Mode::DEFAULT || currentMode_ == Mode::SHADOW_SPLITS) {
+            RenderDirectionalLight();
+        }
+        if (currentMode_ != Mode::SHADOW_SPLITS && currentMode_ != Mode::SSAO_MASK) {
+            RenderPointLights(lights);
+        }
+    }
+
     if (!skybox->Render()) {
+        if (!!annotation_) {
+            annotation_->EndEvent();
+        }
         return false;
     }
 
-    if (!excludeTransparent_) {
+    if (!excludeTransparent) {
         RenderTransparent(irradianceMap, prefilteredMap, BRDF);
+    }
+
+    if (!!annotation_) {
+        annotation_->EndEvent();
     }
 
     return true;
@@ -1382,7 +1743,8 @@ void SceneManager::RenderPrimitive(
     const std::shared_ptr<ID3D11ShaderResourceView>& irradianceMap,
     const std::shared_ptr<ID3D11ShaderResourceView>& prefilteredMap,
     const std::shared_ptr<ID3D11ShaderResourceView>& BRDF,
-    const XMMATRIX& transformation
+    const XMMATRIX& transformation,
+    bool transparent
 ) {
     const Material& material = sceneArrays_[arrayId].materials[primitive.materialId];
 
@@ -1402,26 +1764,33 @@ void SceneManager::RenderPrimitive(
     materialBuffer.occlusionTA = XMINT4(material.occlusionTA.textureId, material.occlusionTA.texCoordId, material.occlusionTA.samplerId, material.occlusionTA.isSRGB);
     device_->GetDeviceContext()->UpdateSubresource(materialParamsBuffer_, 0, nullptr, &materialBuffer, 0, 0);
 
-    if (currentMode_ == DEFAULT || currentMode_ == SHADOW_SPLITS || currentMode_ == SSAO_MASK) {
+    if ((transparent || !deferredRender) && (currentMode_ == Mode::DEFAULT || currentMode_ == Mode::SHADOW_SPLITS || currentMode_ == Mode::SSAO_MASK)) {
         std::vector<ID3D11SamplerState*> samplers = { };
-        samplers.push_back(samplerAvg_.get());
+        if (transparent) {
+            samplers.push_back(samplerAvg_.get());
+        }
         samplers.push_back(samplerPCF_.get());
-        device_->GetDeviceContext()->PSSetSamplers(0, samplers.size(), samplers.data());
+        if (transparent && ((withSSAO && currentMode_ == Mode::DEFAULT) || currentMode_ == Mode::SSAO_MASK)) {
+            samplers.push_back(generalSampler_.get());
+        }
+        device_->GetDeviceContext()->PSSetSamplers(transparent ? 0 : 1, samplers.size(), samplers.data());
 
         std::vector<ID3D11ShaderResourceView*> resources = { };
-        resources.push_back(irradianceMap.get());
-        resources.push_back(prefilteredMap.get());
-        resources.push_back(BRDF.get());
+        if (transparent) {
+            resources.push_back(irradianceMap.get());
+            resources.push_back(prefilteredMap.get());
+            resources.push_back(BRDF.get());
+        }
         for (UINT i = 0; i < CSM_SPLIT_COUNT; ++i) {
-            resources.push_back(shadowSRViews_[i]);
+            resources.push_back(shadowSplits_[i].SRV);
         }
-        if (withSSAO_ && (currentMode_ == DEFAULT || currentMode_ == SSAO_MASK)) {
-            resources.push_back(depthSRView_);
+        if (transparent && ((withSSAO && currentMode_ == Mode::DEFAULT) || currentMode_ == Mode::SSAO_MASK)) {
+            resources.push_back(depthCopy_.SRV);
         }
-        device_->GetDeviceContext()->PSSetShaderResources(0, resources.size(), resources.data());
+        device_->GetDeviceContext()->PSSetShaderResources(transparent ? 0 : 3, resources.size(), resources.data());
     }
-    int m = 2;
-    int k = CSM_SPLIT_COUNT + 4;
+    int m = deferredRender && !transparent ? 0 : 3;
+    int k = deferredRender && !transparent ? 0 : CSM_SPLIT_COUNT + 4;
     if (material.baseColorTA.textureId >= 0) {
         std::vector<ID3D11SamplerState*> samplers = { sceneArrays_[arrayId].samplers[material.baseColorTA.samplerId].get() };
         device_->GetDeviceContext()->PSSetSamplers(m++, samplers.size(), samplers.data());
@@ -1502,35 +1871,47 @@ void SceneManager::RenderPrimitive(
     device_->GetDeviceContext()->VSSetShader(primitive.VS->GetShader().get(), nullptr, 0);
     device_->GetDeviceContext()->VSSetConstantBuffers(0, 1, &worldMatrixBuffer_);
     device_->GetDeviceContext()->VSSetConstantBuffers(1, 1, &viewMatrixBuffer_);
-    switch (currentMode_) {
-    case FRESNEL:
-        device_->GetDeviceContext()->PSSetShader(primitive.PSFresnel->GetShader().get(), nullptr, 0);
-        break;
-    case NDF:
-        device_->GetDeviceContext()->PSSetShader(primitive.PSNdf->GetShader().get(), nullptr, 0);
-        break;
-    case GEOMETRY:
-        device_->GetDeviceContext()->PSSetShader(primitive.PSGeometry->GetShader().get(), nullptr, 0);
-        break;
-    case SHADOW_SPLITS:
-        device_->GetDeviceContext()->PSSetShader(primitive.PSShadowSplits->GetShader().get(), nullptr, 0);
-        break;
-    case SSAO_MASK:
-        device_->GetDeviceContext()->PSSetShader(primitive.PSSSAOMask->GetShader().get(), nullptr, 0);
-        break;
-    default:
-        if (withSSAO_) {
-            device_->GetDeviceContext()->PSSetShader(primitive.PSSSAO->GetShader().get(), nullptr, 0);
-        }
-        else {
-            device_->GetDeviceContext()->PSSetShader(primitive.PSDefault->GetShader().get(), nullptr, 0);
-        }
-        break;
+    if (deferredRender && !transparent) {
+        device_->GetDeviceContext()->PSSetShader(primitive.gBufferPS->GetShader().get(), nullptr, 0);
+        device_->GetDeviceContext()->PSSetConstantBuffers(0, 1, &materialParamsBuffer_);
     }
-    device_->GetDeviceContext()->PSSetConstantBuffers(0, 1, &materialParamsBuffer_);
-    device_->GetDeviceContext()->PSSetConstantBuffers(1, 1, &viewMatrixBuffer_);
-    if (withSSAO_) {
-        device_->GetDeviceContext()->PSSetConstantBuffers(2, 1, &SSAOParamsBuffer_);
+    else {
+        switch (currentMode_) {
+        case Mode::FRESNEL:
+            device_->GetDeviceContext()->PSSetShader(primitive.PSFresnel->GetShader().get(), nullptr, 0);
+            break;
+        case Mode::NDF:
+            device_->GetDeviceContext()->PSSetShader(primitive.PSNdf->GetShader().get(), nullptr, 0);
+            break;
+        case Mode::GEOMETRY:
+            device_->GetDeviceContext()->PSSetShader(primitive.PSGeometry->GetShader().get(), nullptr, 0);
+            break;
+        case Mode::SHADOW_SPLITS:
+            device_->GetDeviceContext()->PSSetShader(primitive.PSShadowSplits->GetShader().get(), nullptr, 0);
+            break;
+        case Mode::SSAO_MASK:
+            if (transparent) {
+                device_->GetDeviceContext()->PSSetShader(primitive.transparentPSSSAOMask->GetShader().get(), nullptr, 0);
+            }
+            else {
+                device_->GetDeviceContext()->PSSetShader(primitive.PSSSAOMask->GetShader().get(), nullptr, 0);
+            }
+            break;
+        default:
+            if (withSSAO && transparent) {
+                device_->GetDeviceContext()->PSSetShader(primitive.transparentPSSSAO->GetShader().get(), nullptr, 0);
+            }
+            else {
+                device_->GetDeviceContext()->PSSetShader(primitive.PSDefault->GetShader().get(), nullptr, 0);
+            }
+            break;
+        }
+        device_->GetDeviceContext()->PSSetConstantBuffers(0, 1, &materialParamsBuffer_);
+        device_->GetDeviceContext()->PSSetConstantBuffers(1, 1, &forwardRenderViewMatrixBuffer_);
+        device_->GetDeviceContext()->PSSetConstantBuffers(2, 1, &matricesBuffer_);
+        if (transparent && ((withSSAO && currentMode_ == Mode::DEFAULT) || currentMode_ == Mode::SSAO_MASK)) {
+            device_->GetDeviceContext()->PSSetConstantBuffers(3, 1, &SSAOParamsBuffer_);
+        }
     }
     device_->GetDeviceContext()->OMSetBlendState(material.blendState.get(), nullptr, 0xFFFFFFFF);
 
@@ -1553,145 +1934,224 @@ void SceneManager::RenderTransparent(
         return;
     }
 
+    if (!!annotation_) {
+        annotation_->BeginEvent(L"Render_transparent");
+    }
+
     std::sort(transparentPrimitives_.begin(), transparentPrimitives_.end());
 
     for (auto& tp : transparentPrimitives_) {
-        RenderPrimitive(tp.arrayId, tp.primitive, irradianceMap, prefilteredMap, BRDF, tp.transformation);
+        RenderPrimitive(tp.arrayId, tp.primitive, irradianceMap, prefilteredMap, BRDF, tp.transformation, true);
+    }
+
+    if (!!annotation_) {
+        annotation_->EndEvent();
     }
 }
 
-bool SceneManager::MakeDepthPrepath(const std::vector<int>& sceneIndices) {
-    if (!IsInit()) {
-        return false;
+void SceneManager::RenderAmbientLight(
+    const std::shared_ptr<ID3D11ShaderResourceView>& irradianceMap,
+    const std::shared_ptr<ID3D11ShaderResourceView>& prefilteredMap,
+    const std::shared_ptr<ID3D11ShaderResourceView>& BRDF
+) {
+    if (!!annotation_) {
+        annotation_->BeginEvent(L"Render_ambient_light");
     }
 
-    device_->GetDeviceContext()->ClearDepthStencilView(depthDSView_, D3D11_CLEAR_DEPTH, 0.0f, 0);
-    device_->GetDeviceContext()->OMSetRenderTargets(0, nullptr, depthDSView_);
-    device_->GetDeviceContext()->OMSetDepthStencilState(depthPrepathDepthStencilState_.get(), 0);
-    device_->GetDeviceContext()->RSSetViewports(1, &depthPrepathViewport_);
-    device_->GetDeviceContext()->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+    std::vector<ID3D11SamplerState*> samplers = { generalSampler_.get() };
+    std::vector<ID3D11ShaderResourceView*> resources = { color_.SRV, features_.SRV, normals_.SRV, depthCopy_.SRV };
+    if (currentMode_ != Mode::SSAO_MASK) {
+        samplers.push_back(samplerAvg_.get());
 
-    ShadowMapViewMatrixBuffer viewMatrix;
-    viewMatrix.viewProjectionMatrix = camera_->GetViewProjectionMatrix();
-    device_->GetDeviceContext()->UpdateSubresource(shadowMapViewMatrixBuffer_, 0, nullptr, &viewMatrix, 0, 0);
-
-    for (auto j : sceneIndices) {
-        if (j < 0 || j >= scenes_.size()) {
-            continue;
-        }
-        for (auto node : scenes_[j].rootNodes) {
-            MakeDepthPrepathForNode(scenes_[j].arraysId, node, scenes_[j].transformation);
-        }
+        resources.push_back(irradianceMap.get());
+        resources.push_back(prefilteredMap.get());
+        resources.push_back(BRDF.get());
     }
-    return true;
-}
+    device_->GetDeviceContext()->PSSetSamplers(0, samplers.size(), samplers.data());
+    device_->GetDeviceContext()->PSSetShaderResources(0, resources.size(), resources.data());
 
-void SceneManager::MakeDepthPrepathForNode(int arrayId, int nodeId, const XMMATRIX& transformation) {
-    const Node& node = sceneArrays_[arrayId].nodes[nodeId];
-    XMMATRIX currentTransformation = XMMatrixMultiply(node.transformation, transformation);
-
-    if (node.meshId >= 0) {
-        const Mesh& mesh = sceneArrays_[arrayId].meshes[node.meshId];
-        for (auto& p : mesh.opaquePrimitives) {
-            MakeDepthPrepathForPrimitive(arrayId, p, AlphaMode::OPAQUE_MODE, currentTransformation);
-        }
-        if (!excludeTransparent_) {
-            for (auto& p : mesh.transparentPrimitives) {
-                MakeDepthPrepathForPrimitive(arrayId, p, AlphaMode::ALPHA_CUTOFF_MODE, currentTransformation);
-            }
-        }
-        for (auto& p : mesh.primitivesWithAlphaCutoff) {
-            MakeDepthPrepathForPrimitive(arrayId, p, AlphaMode::ALPHA_CUTOFF_MODE, currentTransformation);
-        }
+    device_->GetDeviceContext()->OMSetDepthStencilState(generalDepthStencilState_.get(), 0);
+    device_->GetDeviceContext()->RSSetState(generalRasterizerState_.get());
+    device_->GetDeviceContext()->OMSetBlendState(generalBlendState_.get(), nullptr, 0xFFFFFFFF);
+    device_->GetDeviceContext()->IASetInputLayout(mappingVS_->GetInputLayout().get());
+    device_->GetDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    device_->GetDeviceContext()->PSSetConstantBuffers(0, 1, &matricesBuffer_);
+    if (currentMode_ == Mode::SSAO_MASK || withSSAO) {
+        device_->GetDeviceContext()->PSSetConstantBuffers(1, 1, &SSAOParamsBuffer_);
     }
-
-    for (auto c : node.children) {
-        MakeDepthPrepathForNode(arrayId, c, currentTransformation);
+    device_->GetDeviceContext()->VSSetShader(mappingVS_->GetShader().get(), nullptr, 0);
+    if (currentMode_ == Mode::SSAO_MASK) {
+        device_->GetDeviceContext()->PSSetShader(ambientLightPSSSAOMask_->GetShader().get(), nullptr, 0);
     }
-}
-
-void SceneManager::MakeDepthPrepathForPrimitive(int arrayId, const Primitive& primitive, AlphaMode mode, const XMMATRIX& transformation) {
-    const Material& material = sceneArrays_[arrayId].materials[primitive.materialId];
-
-    WorldMatrixBuffer worldMatrix;
-    worldMatrix.worldMatrix = transformation;
-    device_->GetDeviceContext()->UpdateSubresource(worldMatrixBuffer_, 0, nullptr, &worldMatrix, 0, 0);
-
-    if (mode == AlphaMode::ALPHA_CUTOFF_MODE) {
-        ShadowMapAlphaCutoffBuffer alphaCutoff;
-        alphaCutoff.baseColorFactor = material.baseColorFactor;
-        alphaCutoff.alphaCutoffTexCoord = XMFLOAT4(material.alphaCutoff, material.baseColorTA.texCoordId, 0.0f, 0.0f);
-        device_->GetDeviceContext()->UpdateSubresource(shadowMapAlphaCutoffBuffer_, 0, nullptr, &alphaCutoff, 0, 0);
-
-        if (material.baseColorTA.textureId >= 0) {
-            ID3D11ShaderResourceView* resources[] = { sceneArrays_[arrayId].textures[material.baseColorTA.textureId]->GetSRV(material.baseColorTA.isSRGB).get() };
-            device_->GetDeviceContext()->PSSetShaderResources(0, 1, resources);
-
-            ID3D11SamplerState* samplers[] = { sceneArrays_[arrayId].samplers[material.baseColorTA.samplerId].get() };
-            device_->GetDeviceContext()->PSSetSamplers(0, 1, samplers);
-        }
-    }
-
-    device_->GetDeviceContext()->IASetInputLayout(primitive.shadowVS->GetInputLayout().get());
-    UINT numBuffers = primitive.attributes.size();
-    std::vector<ID3D11Buffer*> vertexBuffers;
-    std::vector<UINT> strides;
-    std::vector<UINT> offsets;
-    for (auto& a : primitive.attributes) {
-        const BufferAccessor& accessor = sceneArrays_[arrayId].accessors[a.verticesAccessorId];
-        vertexBuffers.push_back(accessor.buffer.get());
-        strides.push_back(accessor.byteStride);
-        offsets.push_back(accessor.byteOffset);
-    }
-    device_->GetDeviceContext()->IASetVertexBuffers(0, numBuffers, vertexBuffers.data(), strides.data(), offsets.data());
-    device_->GetDeviceContext()->RSSetState(material.rasterizerState.get());
-    device_->GetDeviceContext()->IASetPrimitiveTopology(primitive.mode);
-    device_->GetDeviceContext()->VSSetShader(primitive.shadowVS->GetShader().get(), nullptr, 0);
-    device_->GetDeviceContext()->VSSetConstantBuffers(0, 1, &worldMatrixBuffer_);
-    device_->GetDeviceContext()->VSSetConstantBuffers(1, 1, &shadowMapViewMatrixBuffer_);
-
-    if (mode == AlphaMode::ALPHA_CUTOFF_MODE) {
-        device_->GetDeviceContext()->PSSetShader(primitive.shadowPS->GetShader().get(), nullptr, 0);
-        device_->GetDeviceContext()->PSSetConstantBuffers(0, 1, &shadowMapAlphaCutoffBuffer_);
+    else if (withSSAO) {
+        device_->GetDeviceContext()->PSSetShader(ambientLightPSSSAO_->GetShader().get(), nullptr, 0);
     }
     else {
-        device_->GetDeviceContext()->PSSetShader(nullptr, nullptr, 0);
+        device_->GetDeviceContext()->PSSetShader(ambientLightPS_->GetShader().get(), nullptr, 0);
     }
+    device_->GetDeviceContext()->Draw(6, 0);
 
-    if (primitive.indicesAccessorId >= 0) {
-        const BufferAccessor& accessor = sceneArrays_[arrayId].accessors[primitive.indicesAccessorId];
-        device_->GetDeviceContext()->IASetIndexBuffer(accessor.buffer.get(), accessor.format, accessor.byteOffset);
-        device_->GetDeviceContext()->DrawIndexed(accessor.count, 0, 0);
-    }
-    else {
-        device_->GetDeviceContext()->Draw(sceneArrays_[arrayId].accessors[primitive.attributes[0].verticesAccessorId].count, 0);
+    if (!!annotation_) {
+        annotation_->EndEvent();
     }
 }
 
-void SceneManager::SetMode(Mode mode) {
-    currentMode_ = mode;
+void SceneManager::RenderDirectionalLight() {
+    if (!!annotation_) {
+        annotation_->BeginEvent(L"Render_directional_light");
+    }
+
+    auto dirLightInfo = directionalLight_->GetInfo();
+    DirectionalLightBuffer lightBuffer;
+    lightBuffer.color = dirLightInfo.color;
+    lightBuffer.direction = dirLightInfo.direction;
+    lightBuffer.viewProjectionMatrix = dirLightInfo.viewProjectionMatrix;
+    lightBuffer.splitSizeRatio = dirLightInfo.splitSizeRatio;
+    device_->GetDeviceContext()->UpdateSubresource(directionalLightBuffer_, 0, nullptr, &lightBuffer, 0, 0);
+
+    std::vector<ID3D11SamplerState*> samplers = { generalSampler_.get(), samplerPCF_.get() };
+    std::vector<ID3D11ShaderResourceView*> resources = { color_.SRV, features_.SRV, normals_.SRV, emissive_.SRV, depthCopy_.SRV };
+    for (UINT i = 0; i < CSM_SPLIT_COUNT; ++i) {
+        resources.push_back(shadowSplits_[i].SRV);
+    }
+    device_->GetDeviceContext()->PSSetSamplers(0, samplers.size(), samplers.data());
+    device_->GetDeviceContext()->PSSetShaderResources(0, resources.size(), resources.data());
+
+    device_->GetDeviceContext()->OMSetDepthStencilState(generalDepthStencilState_.get(), 0);
+    device_->GetDeviceContext()->RSSetState(generalRasterizerState_.get());
+    device_->GetDeviceContext()->OMSetBlendState(generalBlendState_.get(), nullptr, 0xFFFFFFFF);
+    device_->GetDeviceContext()->IASetInputLayout(mappingVS_->GetInputLayout().get());
+    device_->GetDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    device_->GetDeviceContext()->PSSetConstantBuffers(0, 1, &directionalLightBuffer_);
+    device_->GetDeviceContext()->PSSetConstantBuffers(1, 1, &matricesBuffer_);
+    device_->GetDeviceContext()->VSSetShader(mappingVS_->GetShader().get(), nullptr, 0);
+    if (currentMode_ == Mode::SHADOW_SPLITS) {
+        device_->GetDeviceContext()->PSSetShader(directionalLightPSShadowSplits_->GetShader().get(), nullptr, 0);
+    }
+    else {
+        device_->GetDeviceContext()->PSSetShader(directionalLightPS_->GetShader().get(), nullptr, 0);
+    }
+    device_->GetDeviceContext()->Draw(6, 0);
+
+    if (!!annotation_) {
+        annotation_->EndEvent();
+    }
+}
+
+void SceneManager::RenderPointLights(const std::vector<PointLight>& lights) {
+    if (lights.empty()) {
+        return;
+    }
+
+    if (!!annotation_) {
+        annotation_->BeginEvent(L"Render_point_lights");
+    }
+
+    ID3D11SamplerState* samplers[] = { generalSampler_.get() };
+    device_->GetDeviceContext()->PSSetSamplers(0, 1, samplers);
+
+    ID3D11ShaderResourceView* resources[] = { color_.SRV, features_.SRV, normals_.SRV, depthCopy_.SRV };
+    device_->GetDeviceContext()->PSSetShaderResources(0, 4, resources);
+    device_->GetDeviceContext()->OMSetDepthStencilState(pointLightDepthStencilState_.get(), 0);
+    device_->GetDeviceContext()->RSSetState(pointLightRasterizerState_.get());
+    device_->GetDeviceContext()->OMSetBlendState(generalBlendState_.get(), nullptr, 0xFFFFFFFF);
+
+    device_->GetDeviceContext()->IASetIndexBuffer(sphereIndexBuffer_, DXGI_FORMAT_R32_UINT, 0);
+    ID3D11Buffer* vertexBuffers[] = { sphereVertexBuffer_ };
+    UINT strides[] = { sizeof(SphereVertex) };
+    UINT offsets[] = { 0 };
+    device_->GetDeviceContext()->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
+    device_->GetDeviceContext()->IASetInputLayout(pointLightVS_->GetInputLayout().get());
+    device_->GetDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    device_->GetDeviceContext()->VSSetShader(pointLightVS_->GetShader().get(), nullptr, 0);
+    switch (currentMode_) {
+    case Mode::DEFAULT:
+        device_->GetDeviceContext()->PSSetShader(pointLightPS_->GetShader().get(), nullptr, 0);
+        break;
+    case Mode::FRESNEL:
+        device_->GetDeviceContext()->PSSetShader(pointLightPSFresnel_->GetShader().get(), nullptr, 0);
+        break;
+    case Mode::NDF:
+        device_->GetDeviceContext()->PSSetShader(pointLightPSNDF_->GetShader().get(), nullptr, 0);
+        break;
+    case Mode::GEOMETRY:
+        device_->GetDeviceContext()->PSSetShader(pointLightPSGeometry_->GetShader().get(), nullptr, 0);
+        break;
+    default:
+        break;
+    }
+    device_->GetDeviceContext()->VSSetConstantBuffers(1, 1, &viewMatrixBuffer_);
+    device_->GetDeviceContext()->PSSetConstantBuffers(0, 1, &matricesBuffer_);
+
+    InstancingWorldMatrixBuffer worldMatrix;
+    LightBuffer lightBuffer;
+    int i = 0;
+    for (auto& l : lights) {
+        float radius = sqrt(l.color.w / clampRadianceLimit);
+        XMMATRIX transformation = XMMatrixIdentity();
+        transformation = XMMatrixMultiply(XMMatrixTranslation(l.pos.x, l.pos.y, l.pos.z), transformation);
+        transformation = XMMatrixMultiply(XMMatrixScaling(radius, radius, radius), transformation);
+
+        worldMatrix.worldMatrix[i] = transformation;
+
+        lightBuffer.color[i] = l.color;
+        lightBuffer.pos[i] = l.pos;
+        lightBuffer.parameters[i] = XMFLOAT4(radius, smoothClampRadianceLimit, clampRadianceLimit, 0.0f);
+
+        ++i;
+    }
+    device_->GetDeviceContext()->UpdateSubresource(instancingWorldMatrixBuffer_, 0, nullptr, &worldMatrix, 0, 0);
+    device_->GetDeviceContext()->UpdateSubresource(lightBuffer_, 0, nullptr, &lightBuffer, 0, 0);
+    device_->GetDeviceContext()->VSSetConstantBuffers(0, 1, &instancingWorldMatrixBuffer_);
+    device_->GetDeviceContext()->PSSetConstantBuffers(1, 1, &lightBuffer_);
+
+    device_->GetDeviceContext()->DrawIndexedInstanced(sphereNumIndices_, (UINT)lights.size(), 0, 0, 0);
+    if (!!annotation_) {
+        annotation_->EndEvent();
+    }
 }
 
 bool SceneManager::Resize(int width, int height) {
     if (!IsInit()) {
         return false;
     }
-    
+
     width_ = width;
     height_ = height;
 
-    n = 0;
+    n_ = 0;
     int minSide = min(width, height);
     while (minSide >>= 1) {
-        n++;
+        ++n_;
     }
 
-    SAFE_RELEASE(transparentDepthBuffer_);
-    SAFE_RELEASE(transparentDSView_);
-    SAFE_RELEASE(transparentSRView_);
-    SAFE_RELEASE(depthBuffer_);
-    SAFE_RELEASE(depthDSView_);
-    SAFE_RELEASE(depthSRView_);
+    SAFE_RELEASE(depthCopy_.texture);
+    SAFE_RELEASE(depthCopy_.DSV);
+    SAFE_RELEASE(depthCopy_.SRV);
+
+    SAFE_RELEASE(transparentDepth_.texture);
+    SAFE_RELEASE(transparentDepth_.DSV);
+    SAFE_RELEASE(transparentDepth_.SRV);
+
+    SAFE_RELEASE(depth_.texture);
+    SAFE_RELEASE(depth_.DSV);
+    SAFE_RELEASE(depth_.SRV);
+
+    SAFE_RELEASE(normals_.texture);
+    SAFE_RELEASE(normals_.SRV);
+    SAFE_RELEASE(normals_.RTV);
+
+    SAFE_RELEASE(features_.texture);
+    SAFE_RELEASE(features_.SRV);
+    SAFE_RELEASE(features_.RTV);
+
+    SAFE_RELEASE(color_.texture);
+    SAFE_RELEASE(color_.SRV);
+    SAFE_RELEASE(color_.RTV);
+
+    SAFE_RELEASE(emissive_.texture);
+    SAFE_RELEASE(emissive_.SRV);
+    SAFE_RELEASE(emissive_.RTV);
 
     for (int i = 0; i < scaledFrames_.size(); ++i) {
         SAFE_RELEASE(scaledFrames_[i].texture);
@@ -1700,17 +2160,26 @@ bool SceneManager::Resize(int width, int height) {
     }
     scaledFrames_.clear();
 
-    transparentViewport_.Width = width;
-    transparentViewport_.Height = height;
-
-    depthPrepathViewport_.Width = width;
-    depthPrepathViewport_.Height = height;
-
-    HRESULT result = CreateDepthStencilView(width, height, &transparentDepthBuffer_, &transparentDSView_, &transparentSRView_);
+    HRESULT result = CreateDepthStencilView(width, height, depth_);
     if (SUCCEEDED(result)) {
-        result = CreateDepthStencilView(width, height, &depthBuffer_, &depthDSView_, &depthSRView_);
+        result = CreateDepthStencilView(width, height, depthCopy_);
     }
-    for (int i = 0; i < n + 1 && SUCCEEDED(result); ++i) {
+    if (SUCCEEDED(result)) {
+        result = CreateDepthStencilView(width, height, transparentDepth_);
+    }
+    if (SUCCEEDED(result)) {
+        result = CreateTexture(normals_, width, height);
+    }
+    if (SUCCEEDED(result)) {
+        result = CreateTexture(features_, width, height);
+    }
+    if (SUCCEEDED(result)) {
+        result = CreateTexture(color_, width, height);
+    }
+    if (SUCCEEDED(result)) {
+        result = CreateTexture(emissive_, width, height);
+    }
+    for (int i = 0; i < n_ + 1 && SUCCEEDED(result); ++i) {
         RawPtrTexture texture;
         result = CreateTexture(texture, i);
         if (SUCCEEDED(result)) {
@@ -1719,10 +2188,6 @@ bool SceneManager::Resize(int width, int height) {
     }
 
     return SUCCEEDED(result);
-}
-
-bool SceneManager::IsInit() const {
-    return !!SSAOParamsBuffer_;
 }
 
 void SceneManager::Cleanup() {
@@ -1737,28 +2202,75 @@ void SceneManager::Cleanup() {
     downsamplePS_.reset();
     transparentDepthStencilState_.reset();
     samplerMax_.reset();
-    depthPrepathDepthStencilState_.reset();
+    renderTarget_.reset();
+    annotation_.reset();
+    pointLightVS_.reset();
+    pointLightPS_.reset();
+    pointLightPSFresnel_.reset();
+    pointLightPSNDF_.reset();
+    pointLightPSGeometry_.reset();
+    pointLightDepthStencilState_.reset();
+    generalDepthStencilState_.reset();
+    pointLightRasterizerState_.reset();
+    generalRasterizerState_.reset();
+    generalSampler_.reset();
+    generalBlendState_.reset();
+    directionalLightPS_.reset();
+    directionalLightPSShadowSplits_.reset();
+    ambientLightPS_.reset();
+    ambientLightPSSSAO_.reset();
+    ambientLightPSSSAOMask_.reset();
+
+    SAFE_RELEASE(normals_.texture);
+    SAFE_RELEASE(normals_.SRV);
+    SAFE_RELEASE(normals_.RTV);
+
+    SAFE_RELEASE(features_.texture);
+    SAFE_RELEASE(features_.SRV);
+    SAFE_RELEASE(features_.RTV);
+
+    SAFE_RELEASE(color_.texture);
+    SAFE_RELEASE(color_.SRV);
+    SAFE_RELEASE(color_.RTV);
+
+    SAFE_RELEASE(emissive_.texture);
+    SAFE_RELEASE(emissive_.SRV);
+    SAFE_RELEASE(emissive_.RTV);
+
+    SAFE_RELEASE(depthCopy_.texture);
+    SAFE_RELEASE(depthCopy_.DSV);
+    SAFE_RELEASE(depthCopy_.SRV);
+
+    SAFE_RELEASE(transparentDepth_.texture);
+    SAFE_RELEASE(transparentDepth_.DSV);
+    SAFE_RELEASE(transparentDepth_.SRV);
+
+    SAFE_RELEASE(depth_.texture);
+    SAFE_RELEASE(depth_.DSV);
+    SAFE_RELEASE(depth_.SRV);
+
+    SAFE_RELEASE(sphereVertexBuffer_);
+    SAFE_RELEASE(sphereIndexBuffer_);
 
     SAFE_RELEASE(worldMatrixBuffer_);
+    SAFE_RELEASE(instancingWorldMatrixBuffer_);
     SAFE_RELEASE(viewMatrixBuffer_);
-    SAFE_RELEASE(materialParamsBuffer_);
-    SAFE_RELEASE(shadowMapViewMatrixBuffer_);
     SAFE_RELEASE(shadowMapAlphaCutoffBuffer_);
+    SAFE_RELEASE(lightBuffer_);
+    SAFE_RELEASE(directionalLightBuffer_);
+    SAFE_RELEASE(materialParamsBuffer_);
+    SAFE_RELEASE(forwardRenderViewMatrixBuffer_);
+    SAFE_RELEASE(matricesBuffer_);
     SAFE_RELEASE(SSAOParamsBuffer_);
 
-    for (UINT i = 0; i < CSM_SPLIT_COUNT; ++i) {
-        SAFE_RELEASE(shadowBuffers_[i]);
-        SAFE_RELEASE(shadowDSViews_[i]);
-        SAFE_RELEASE(shadowSRViews_[i]);
-    }
-
     SAFE_RELEASE(readMaxTexture_);
-    SAFE_RELEASE(transparentDepthBuffer_);
-    SAFE_RELEASE(transparentDSView_);
-    SAFE_RELEASE(transparentSRView_);
-    SAFE_RELEASE(depthBuffer_);
-    SAFE_RELEASE(depthDSView_);
-    SAFE_RELEASE(depthSRView_);
+
+    for (int i = 0; i < shadowSplits_.size(); ++i) {
+        SAFE_RELEASE(shadowSplits_[i].texture);
+        SAFE_RELEASE(shadowSplits_[i].DSV);
+        SAFE_RELEASE(shadowSplits_[i].SRV);
+    }
+    shadowSplits_.clear();
 
     for (int i = 0; i < scaledFrames_.size(); ++i) {
         SAFE_RELEASE(scaledFrames_[i].texture);
@@ -1770,4 +2282,6 @@ void SceneManager::Cleanup() {
     scenes_.clear();
     sceneArrays_.clear();
     transparentPrimitives_.clear();
+
+    isInit_ = false;
 }
