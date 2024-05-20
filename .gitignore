@@ -396,3 +396,8 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+Lab6/models/pontiac_ventura/*
+Lab6/models/textures/*
+Lab6/models/*.gltf
+Lab6/models/*.bin
